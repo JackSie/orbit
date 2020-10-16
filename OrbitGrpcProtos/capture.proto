@@ -177,6 +177,13 @@ message AddressInfo {
   }
 }
 
+message GpuCommandBuffer {
+  uint64 begin_gpu_timestamp_ns = 1;
+  uint64 approx_begin_cpu_timestamp_ns = 2;
+  uint64 end_gpu_timestamp_ns = 3;
+  uint64 approx_end_cpu_timestamp_ns = 4;
+}
+
 message CaptureEvent {
   oneof event {
     SchedulingSlice scheduling_slice = 1;
@@ -191,5 +198,6 @@ message CaptureEvent {
     InternedTracepointInfo interned_tracepoint_info = 9;
     TracepointEvent tracepoint_event = 10;
     IntrospectionScope introspection_scope = 12;
+    GpuCommandBuffer gpu_command_buffer = 13;
   }
 }
