@@ -69,6 +69,8 @@ class DispatchTable {
   [[nodiscard]] PFN_vkCmdResetQueryPool CmdResetQueryPool(const VkDevice& device);
   [[nodiscard]] PFN_vkGetQueryPoolResults GetQueryPoolResults(const VkDevice& device);
 
+  [[nodiscard]] PFN_vkCmdPipelineBarrier CmdPipelineBarrier(const VkDevice& device);
+
   [[nodiscard]] PFN_vkCreateFence CreateFence(const VkDevice& device);
   [[nodiscard]] PFN_vkDestroyFence DestroyFence(const VkDevice& device);
   [[nodiscard]] PFN_vkGetFenceStatus GetFenceStatus(const VkDevice& device);

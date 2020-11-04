@@ -44,7 +44,6 @@ void CommandBufferManager::TrackCommandBuffers(VkDevice device, VkCommandPool po
     associated_cbs.insert(cb);
     tracked_command_buffers_.insert(cb);
     command_buffer_to_device_[cb] = device;
-    command_buffer_to_state_[cb] = {};
   }
 }
 
@@ -65,7 +64,6 @@ void CommandBufferManager::UntrackCommandBuffers(VkDevice device, VkCommandPool 
     CHECK(command_buffer_to_device_.contains(command_buffer));
     CHECK(command_buffer_to_device_.at(command_buffer) == device);
     command_buffer_to_device_.erase(command_buffer);
-    command_buffer_to_state_.erase(command_buffer);
   }
 }
 
@@ -120,12 +118,12 @@ void CommandBufferManager::MarkCommandBufferBegin(const VkCommandBuffer& command
                                              query_pool, slot_index);
   {
     absl::WriterMutexLock lock(&mutex_);
-    CHECK(command_buffer_to_state_.contains(command_buffer));
-    CommandBufferState& command_buffer_state = command_buffer_to_state_.at(command_buffer);
+    CHECK(!command_buffer_to_state_.contains(command_buffer));
     MarkerState marker_state{
         .type = kCommandBuffer, .text = "Command Buffer", .slot_index = slot_index};
-    command_buffer_state.command_buffer_marker = std::move(marker_state);
-    command_buffer_state.resetting_slot_indices = std::move(base_slots_to_reset);
+    command_buffer_to_state_[command_buffer] = {
+        .command_buffer_marker = std::move(marker_state),
+        .resetting_slot_indices = std::move(base_slots_to_reset)};
   }
 }
 
@@ -134,13 +132,17 @@ void CommandBufferManager::MarkCommandBufferEnd(const VkCommandBuffer& command_b
   if (!connector_->IsCapturing()) {
     return;
   }
+  absl::ReaderMutexLock lock(&mutex_);
+  if (!command_buffer_to_state_.contains(command_buffer)) {
+    return;
+  }
   VkDevice device;
   {
-    absl::ReaderMutexLock lock(&mutex_);
     CHECK(command_buffer_to_device_.contains(command_buffer));
     device = command_buffer_to_device_.at(command_buffer);
   }
   VkQueryPool query_pool = timer_query_pool_->GetQueryPool(device);
+
   CommandBufferState& command_buffer_state = command_buffer_to_state_.at(command_buffer);
 
   uint32_t slot_base_index = command_buffer_state.command_buffer_marker.slot_index;
@@ -167,12 +169,15 @@ void CommandBufferManager::DoSubmit(VkQueue queue, uint32_t submit_count,
     for (uint32_t command_buffer_index = 0; command_buffer_index < submit_info.commandBufferCount;
          ++command_buffer_index) {
       const VkCommandBuffer& command_buffer = submit_info.pCommandBuffers[command_buffer_index];
+      if (!command_buffer_to_state_.contains(command_buffer)) {
+        continue;
+      }
       CommandBufferState& state = command_buffer_to_state_.at(command_buffer);
       SubmittedCommandBuffer submitted_command_buffer{
           .command_buffer_marker = std::move(state.command_buffer_marker),
           .resetting_slot_indices = std::move(state.resetting_slot_indices)};
       submitted_submit_info.command_buffers.emplace_back(std::move(submitted_command_buffer));
-      state.resetting_slot_indices.clear();
+      command_buffer_to_state_.erase(command_buffer);
     }
   }
 }
@@ -259,6 +264,9 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
 void CommandBufferManager::ResetCommandBuffer(const VkCommandBuffer& command_buffer) {
   LOG("ResetCommandBuffer");
   absl::WriterMutexLock lock(&mutex_);
+  if (!command_buffer_to_state_.contains(command_buffer)) {
+    return;
+  }
   CommandBufferState& state = command_buffer_to_state_.at(command_buffer);
   const VkDevice& device = command_buffer_to_device_.at(command_buffer);
   std::vector<uint32_t> marker_slots_to_rollback;
@@ -266,8 +274,7 @@ void CommandBufferManager::ResetCommandBuffer(const VkCommandBuffer& command_buf
   timer_query_pool_->RollbackPendingQuerySlots(device, marker_slots_to_rollback);
   timer_query_pool_->RollbackPendingResetSlots(device, state.resetting_slot_indices);
 
-  state.resetting_slot_indices.clear();
-  state.command_buffer_marker = {};
+  command_buffer_to_state_.erase(command_buffer);
 }
 
 void CommandBufferManager::ResetCommandPool(const VkCommandPool& command_pool) {

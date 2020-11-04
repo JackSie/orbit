@@ -5,6 +5,7 @@
 #ifndef ORBIT_VULKAN_LAYER_ORBIT_CONNECTOR_H_
 #define ORBIT_VULKAN_LAYER_ORBIT_CONNECTOR_H_
 
+#include <OrbitBase/Logging.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -20,6 +21,7 @@ class OrbitConnector {
 
  private:
   static void CheckIsCapturing(std::atomic<bool>* exit_requested, std::atomic<bool>* is_capturing) {
+    LOG("CheckIsCapturing");
     while (!*exit_requested) {
       {
         std::ifstream f("/mnt/developer/orbit_layer_lock");

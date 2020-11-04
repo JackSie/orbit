@@ -40,7 +40,9 @@ class LayerLogic {
         timer_query_pool_(&dispatch_table_, &queue_family_info_manager_, &physical_device_manager_),
         writer_("/mnt/developer/orbit_test_file"),
         command_buffer_manager_(&dispatch_table_, &timer_query_pool_, &physical_device_manager_,
-                                &writer_, &connector_) {}
+                                &writer_, &connector_) {
+    LOG("LayerLogic");
+  }
 
   [[nodiscard]] VkResult PreCallAndCallCreateInstance(const VkInstanceCreateInfo* create_info,
                                                       const VkAllocationCallbacks* allocator,

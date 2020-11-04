@@ -91,6 +91,9 @@ class TimerQueryPool {
       CHECK(is_base_slot);
       uint32_t logical_slot_index = physical_slot_index / 2;
       const SlotState& current_state = slot_states.at(logical_slot_index);
+      if (current_state != kQueryPendingOnGPU) {
+        LOG("state: %u, index: %u", current_state, logical_slot_index);
+      }
       CHECK(current_state == kQueryPendingOnGPU);
       slot_states.at(logical_slot_index) = kReadyForQueryIssue;
     }

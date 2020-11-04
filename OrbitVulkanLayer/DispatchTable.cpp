@@ -109,6 +109,9 @@ void DispatchTable::CreateDeviceDispatchTable(
   dispatch_table.CmdSetEvent =
       absl::bit_cast<PFN_vkCmdSetEvent>(next_get_device_proc_add_function(device, "vkCmdSetEvent"));
 
+  dispatch_table.CmdPipelineBarrier = absl::bit_cast<PFN_vkCmdPipelineBarrier>(
+      next_get_device_proc_add_function(device, "vkCmdPipelineBarrier"));
+
   {
     absl::WriterMutexLock lock(&mutex_);
     device_dispatch_table_[device] = dispatch_table;
@@ -319,6 +322,11 @@ PFN_vkCmdSetEvent DispatchTable::CmdSetEvent(const VkDevice& device) {
   absl::ReaderMutexLock lock(&mutex_);
   CHECK(device_dispatch_table_.contains(device));
   return device_dispatch_table_.at(device).CmdSetEvent;
+}
+PFN_vkCmdPipelineBarrier DispatchTable::CmdPipelineBarrier(const VkDevice& device) {
+  absl::ReaderMutexLock lock(&mutex_);
+  CHECK(device_dispatch_table_.contains(device));
+  return device_dispatch_table_.at(device).CmdPipelineBarrier;
 }
 
 }  // namespace orbit_vulkan_layer

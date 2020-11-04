@@ -75,6 +75,26 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
                                                            &reset_command_buffer);
   CHECK(result == VK_SUCCESS);
 
+  VkMemoryBarrier memory_barrier = {
+      .pNext = nullptr,
+      .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+      .srcAccessMask =
+          VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_INDEX_READ_BIT |
+          VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT |
+          VK_ACCESS_INPUT_ATTACHMENT_READ_BIT | VK_ACCESS_SHADER_READ_BIT |
+          VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+          VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT |
+          VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT,
+      .dstAccessMask =
+          VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_INDEX_READ_BIT |
+          VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT |
+          VK_ACCESS_INPUT_ATTACHMENT_READ_BIT | VK_ACCESS_SHADER_READ_BIT |
+          VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+          VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT |
+          VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT};
+
   VkEventCreateInfo event_create_info = {
       .sType = VK_STRUCTURE_TYPE_EVENT_CREATE_INFO, .pNext = nullptr, .flags = 0};
 
@@ -114,23 +134,44 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
   dispatch_table_->CmdResetQueryPool(device)(reset_command_buffer, query_pool, 0,
                                              kNumPhysicalTimerQuerySlots);
 
+  dispatch_table_->CmdPipelineBarrier(device)(
+      reset_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      0, 1, &memory_barrier, 0, nullptr, 0, nullptr);
   dispatch_table_->CmdSetEvent(device)(reset_command_buffer, reset_done_event,
                                        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+  dispatch_table_->CmdPipelineBarrier(device)(
+      reset_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      0, 1, &memory_barrier, 0, nullptr, 0, nullptr);
   dispatch_table_->CmdWaitEvents(device)(
       reset_command_buffer, 1, &ready_to_write_timestamp_event_0, VK_PIPELINE_STAGE_HOST_BIT,
       VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, nullptr, 0, nullptr, 0, nullptr);
   dispatch_table_->CmdWriteTimestamp(device)(reset_command_buffer,
                                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool, 0);
+  dispatch_table_->CmdPipelineBarrier(device)(
+      reset_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      0, 1, &memory_barrier, 0, nullptr, 0, nullptr);
   dispatch_table_->CmdWaitEvents(device)(
       reset_command_buffer, 1, &ready_to_write_timestamp_event_1, VK_PIPELINE_STAGE_HOST_BIT,
       VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, nullptr, 0, nullptr, 0, nullptr);
+  dispatch_table_->CmdPipelineBarrier(device)(
+      reset_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      0, 1, &memory_barrier, 0, nullptr, 0, nullptr);
   dispatch_table_->CmdWriteTimestamp(device)(reset_command_buffer,
                                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool, 1);
+  dispatch_table_->CmdPipelineBarrier(device)(
+      reset_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      0, 1, &memory_barrier, 0, nullptr, 0, nullptr);
   dispatch_table_->CmdSetEvent(device)(reset_command_buffer, write_timestamps_done_event,
                                        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+  dispatch_table_->CmdPipelineBarrier(device)(
+      reset_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      0, 1, &memory_barrier, 0, nullptr, 0, nullptr);
   dispatch_table_->CmdWaitEvents(device)(
       reset_command_buffer, 1, &read_timestamps_done_event, VK_PIPELINE_STAGE_HOST_BIT,
       VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, nullptr, 0, nullptr, 0, nullptr);
+  dispatch_table_->CmdPipelineBarrier(device)(
+      reset_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      0, 1, &memory_barrier, 0, nullptr, 0, nullptr);
   dispatch_table_->CmdResetQueryPool(device)(reset_command_buffer, query_pool, 0, 2);
   result = dispatch_table_->EndCommandBuffer(device)(reset_command_buffer);
   CHECK(result == VK_SUCCESS);
@@ -170,7 +211,7 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
   CHECK(result == VK_SUCCESS);
   std::chrono::steady_clock::time_point cpu_timestamp_0 = std::chrono::steady_clock::now();
 
-  std::this_thread::sleep_for(std::chrono::seconds(1));
+  std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
   result = dispatch_table_->SetEvent(device)(device, ready_to_write_timestamp_event_1);
   CHECK(result == VK_SUCCESS);
@@ -184,8 +225,6 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
     }
     CHECK(event_status == VK_EVENT_RESET);
   }
-
-  std::this_thread::sleep_for(std::chrono::seconds(1));
 
   uint64_t gpu_timestamp_0;
   uint64_t gpu_timestamp_1;
