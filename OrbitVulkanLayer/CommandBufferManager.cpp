@@ -184,7 +184,7 @@ void CommandBufferManager::DoSubmit(VkQueue queue, uint32_t submit_count,
 
 void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
   LOG("CompleteSubmits");
-  timer_query_pool_->PrintState(device);
+  VkQueryPool query_pool = timer_query_pool_->GetQueryPool(device);
   std::vector<SubmittedSubmitInfo> completed_submits;
   {
     absl::WriterMutexLock lock(&mutex_);
@@ -202,8 +202,8 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
         VkDeviceSize result_stride = sizeof(uint64_t);
         uint64_t test_query_result = 0;
         VkResult query_worked = dispatch_table_->GetQueryPoolResults(device)(
-            device, timer_query_pool_->GetQueryPool(device), check_slot_index_base + 1, 1,
-            sizeof(test_query_result), &test_query_result, result_stride, VK_QUERY_RESULT_64_BIT);
+            device, query_pool, check_slot_index_base + 1, 1, sizeof(test_query_result),
+            &test_query_result, result_stride, VK_QUERY_RESULT_64_BIT);
         if (query_worked == VK_SUCCESS) {
           completed_submits.emplace_back(submit_info);
           submit_iter = submitted_queue.submitted_submit_infos.erase(submit_iter);
@@ -235,14 +235,14 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
 
       uint64_t begin_timestamp = 0;
       VkResult result_status = dispatch_table_->GetQueryPoolResults(device)(
-          device, timer_query_pool_->GetQueryPool(device), marker.slot_index, 1,
-          sizeof(begin_timestamp), &begin_timestamp, result_stride, VK_QUERY_RESULT_64_BIT);
+          device, query_pool, marker.slot_index, 1, sizeof(begin_timestamp), &begin_timestamp,
+          result_stride, VK_QUERY_RESULT_64_BIT);
       CHECK(result_status == VK_SUCCESS);
 
       uint64_t end_timestamp = 0;
       result_status = dispatch_table_->GetQueryPoolResults(device)(
-          device, timer_query_pool_->GetQueryPool(device), marker.slot_index + 1, 1,
-          sizeof(end_timestamp), &end_timestamp, result_stride, VK_QUERY_RESULT_64_BIT);
+          device, query_pool, marker.slot_index + 1, 1, sizeof(end_timestamp), &end_timestamp,
+          result_stride, VK_QUERY_RESULT_64_BIT);
 
       CHECK(result_status == VK_SUCCESS);
 
