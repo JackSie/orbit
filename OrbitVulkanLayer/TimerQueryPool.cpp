@@ -257,8 +257,6 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
     }
   }
 
-  LOG("DONE - CLEAN UP");
-
   dispatch_table_->DestroyFence(device)(device, reset_fence, nullptr);
   dispatch_table_->FreeCommandBuffers(device)(device, pool, 1, &reset_command_buffer);
   dispatch_table_->DestroyCommandPool(device)(device, pool, nullptr);
@@ -273,11 +271,10 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
   gpu_timestamp_1 = static_cast<uint64_t>(static_cast<double>(gpu_timestamp_1) *
                                           properties.limits.timestampPeriod);
 
-  int64_t offset_0 = gpu_timestamp_0 - cpu_timestamp_0.time_since_epoch().count();
-  int64_t offset_1 = gpu_timestamp_1 - cpu_timestamp_1.time_since_epoch().count();
+  int64_t offset_0 = cpu_timestamp_0.time_since_epoch().count() - gpu_timestamp_0;
+  int64_t offset_1 = cpu_timestamp_1.time_since_epoch().count() - gpu_timestamp_1;
   int64_t approx_offset = (offset_0 + offset_1) / 2;
 
-  LOG("CLEAN UP READ");
   physical_device_manager_->RegisterApproxCpuTimestampOffset(physical_device, approx_offset);
 
   LOG("DIFF GPU / CPU 1: %ld ns", gpu_timestamp_0 - cpu_timestamp_0.time_since_epoch().count());

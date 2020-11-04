@@ -125,10 +125,12 @@ void GpuTrack::SetTimesliceText(const TimerInfo& timer_info, double elapsed_us, 
 
     text_box->SetElapsedTimeTextLength(time.length());
 
-    CHECK(timer_info.type() == TimerInfo::kGpuActivity);
+    CHECK(timer_info.type() == TimerInfo::kGpuActivity ||
+          timer_info.type() == TimerInfo::kGpuCommandBuffer);
 
     std::string text = absl::StrFormat(
-        "%s  %s", time_graph_->GetStringManager()->Get(timer_info.user_data_key()).value_or(""),
+        "%s  %s",
+        time_graph_->GetStringManager()->Get(timer_info.user_data_key()).value_or("Command Buffer"),
         time.c_str());
     text_box->SetText(text);
   }

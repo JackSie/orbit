@@ -296,21 +296,24 @@ void TimeGraph::ProcessTimer(const TimerInfo& timer_info, const FunctionInfo* fu
     ProcessOrbitFunctionTimer(function->orbit_type(), timer_info);
   }
 
-  if (timer_info.type() == TimerInfo::kGpuActivity) {
-    uint64_t timeline_hash = timer_info.timeline_hash();
-    std::shared_ptr<GpuTrack> track = GetOrCreateGpuTrack(timeline_hash);
-    track->OnTimer(timer_info);
-  } else if (timer_info.type() == TimerInfo::kFrame) {
-    std::shared_ptr<FrameTrack> track = GetOrCreateFrameTrack(*function);
-    track->OnTimer(timer_info);
-  } else if (timer_info.type() == TimerInfo::kIntrospection) {
-    ProcessIntrospectionTimer(timer_info);
-  } else {
-    std::shared_ptr<ThreadTrack> track = GetOrCreateThreadTrack(timer_info.thread_id());
-    if (timer_info.type() != TimerInfo::kCoreActivity) {
+  switch (timer_info.type()) {
+    case TimerInfo::kGpuActivity: {
+      uint64_t timeline_hash = timer_info.timeline_hash();
+      std::shared_ptr<GpuTrack> track = GetOrCreateGpuTrack(timeline_hash);
       track->OnTimer(timer_info);
-      ++thread_count_map_[timer_info.thread_id()];
-    } else {
+      break;
+    }
+    case TimerInfo::kFrame: {
+      std::shared_ptr<FrameTrack> track = GetOrCreateFrameTrack(*function);
+      track->OnTimer(timer_info);
+      break;
+    }
+    case TimerInfo::kIntrospection: {
+      ProcessIntrospectionTimer(timer_info);
+      break;
+    }
+    case TimerInfo::kCoreActivity: {
+      std::shared_ptr<ThreadTrack> track = GetOrCreateThreadTrack(timer_info.thread_id());
       scheduler_track_->OnTimer(timer_info);
       if (GetNumCores() <= static_cast<uint32_t>(timer_info.processor())) {
         auto num_cores = timer_info.processor() + 1;
@@ -318,7 +321,21 @@ void TimeGraph::ProcessTimer(const TimerInfo& timer_info, const FunctionInfo* fu
         layout_.SetNumCores(num_cores);
         scheduler_track_->SetLabel(absl::StrFormat("Scheduler (%u cores)", num_cores));
       }
+      break;
     }
+    case TimerInfo::kGpuCommandBuffer: {
+      std::shared_ptr<GpuTrack> track = GetOrCreateGpuTrack(0);
+      track->OnTimer(timer_info);
+      break;
+    }
+    case TimerInfo::kNone: {
+      std::shared_ptr<ThreadTrack> track = GetOrCreateThreadTrack(timer_info.thread_id());
+      track->OnTimer(timer_info);
+      ++thread_count_map_[timer_info.thread_id()];
+      break;
+    }
+    default:
+      UNREACHABLE();
   }
 
   NeedsUpdate();

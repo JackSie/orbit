@@ -4,10 +4,18 @@
 
 #include "CaptureServiceImpl.h"
 
+#include "OrbitBase/MakeUniqueForOverwrite.h"
+
+#include <cstdio>
+#include <iostream>
+
 #include "CaptureEventBuffer.h"
 #include "CaptureEventSender.h"
 #include "LinuxTracingHandler.h"
 #include "OrbitBase/Logging.h"
+#include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/io/zero_copy_stream_impl.h"
+#include "google/protobuf/message.h"
 
 namespace orbit_service {
 
@@ -48,6 +56,23 @@ class SenderThreadCaptureEventBuffer final : public CaptureEventBuffer {
   ~SenderThreadCaptureEventBuffer() override { CHECK(!sender_thread_.joinable()); }
 
  private:
+
+  bool ReadMessage(google::protobuf::Message* message,
+                 google::protobuf::io::CodedInputStream* input) {
+  uint32_t message_size;
+  if (!input->ReadLittleEndian32(&message_size)) {
+    return false;
+  }
+
+  std::unique_ptr<char[]> buffer = make_unique_for_overwrite<char[]>(message_size);
+  if (!input->ReadRaw(buffer.get(), message_size)) {
+    return false;
+  }
+  message->ParseFromArray(buffer.get(), message_size);
+
+  return true;
+}
+
   void SenderThread() {
     pthread_setname_np(pthread_self(), "SenderThread");
     constexpr absl::Duration kSendTimeInterval = absl::Milliseconds(20);
@@ -68,6 +93,20 @@ class SenderThreadCaptureEventBuffer final : public CaptureEventBuffer {
                                               kSendTimeInterval);
       if (stop_requested_) {
         stopped = true;
+
+        // now read the vulkan layer result:
+      std::ifstream file("/mnt/developer/orbit_test_file", std::ios::binary);
+      if (file.good()) {
+        google::protobuf::io::IstreamInputStream input_stream(&file);
+        google::protobuf::io::CodedInputStream coded_input(&input_stream);
+
+        orbit_grpc_protos::GpuCommandBuffer command_buffer;
+        while (ReadMessage(&command_buffer, &coded_input)) {
+          CaptureEvent event;
+          event.mutable_gpu_command_buffer()->CopyFrom(command_buffer);
+          event_buffer_.emplace_back(std::move(event));
+        }
+      }
       }
       std::vector<CaptureEvent> buffered_events = std::move(event_buffer_);
       event_buffer_.clear();
@@ -139,13 +178,20 @@ grpc::Status CaptureServiceImpl::Capture(
   LOG("Read CaptureRequest from Capture's gRPC stream: starting capture");
   tracing_handler.Start(std::move(*request.mutable_capture_options()));
 
+  {
+    LOG("Requesting Vulkan Layer To Writer!?");
+    std::ofstream layer_start_capture_file("/mnt/developer/orbit_layer_lock");
+    layer_start_capture_file << "lock" << std::endl;
+    layer_start_capture_file.close();
+  }
+
   // The client asks for the capture to be stopped by calling WritesDone.
   // At that point, this call to Read will return false.
   // In the meantime, it blocks if no message is received.
   while (reader_writer->Read(&request)) {
   }
   LOG("Client finished writing on Capture's gRPC stream: stopping capture");
-
+  std::remove("/mnt/developer/orbit_layer_lock");
   tracing_handler.Stop();
   LOG("LinuxTracingHandler stopped: perf_event_open tracing is done");
 

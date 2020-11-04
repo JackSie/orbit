@@ -148,6 +148,7 @@ message TimerInfo {
     kIntrospection = 2;
     kGpuActivity = 3;
     kFrame = 4;
+    kGpuCommandBuffer =5;
   }
   Type type = 6;
 
