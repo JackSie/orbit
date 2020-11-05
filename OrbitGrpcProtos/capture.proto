@@ -182,6 +182,7 @@ message GpuCommandBuffer {
   uint64 approx_begin_cpu_timestamp_ns = 2;
   uint64 end_gpu_timestamp_ns = 3;
   uint64 approx_end_cpu_timestamp_ns = 4;
+  int32 thread_id = 5;
 }
 
 message CaptureEvent {

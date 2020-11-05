@@ -209,6 +209,8 @@ void CaptureEventProcessor::ProcessGpuCommandBuffer(const GpuCommandBuffer& gpu_
   TimerInfo command_buffer_timer;
   command_buffer_timer.set_start(gpu_command_buffer.approx_begin_cpu_timestamp_ns());
   command_buffer_timer.set_end(gpu_command_buffer.approx_end_cpu_timestamp_ns());
+  command_buffer_timer.set_processor(-1);
+  command_buffer_timer.set_thread_id(gpu_command_buffer.thread_id());
   command_buffer_timer.set_type(TimerInfo::kGpuCommandBuffer);
   capture_listener_->OnTimer(command_buffer_timer);
 }

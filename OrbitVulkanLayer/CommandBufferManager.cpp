@@ -4,7 +4,11 @@
 
 #include "CommandBufferManager.h"
 
+#include <sys/syscall.h>
+#include <unistd.h>
+
 #include "OrbitBase/Logging.h"
+#define gettid() syscall(SYS_gettid)
 
 namespace orbit_vulkan_layer {
 
@@ -249,9 +253,12 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
       begin_timestamp =
           static_cast<uint64_t>(static_cast<double>(begin_timestamp) * timestamp_period);
       end_timestamp = static_cast<uint64_t>(static_cast<double>(end_timestamp) * timestamp_period);
+
+      int32_t tid = gettid();
+
       writer_->WriteCommandBuffer(
           begin_timestamp, end_timestamp,
-          physical_device_manager_->GetApproxCpuTimestampOffset(physical_device));
+          physical_device_manager_->GetApproxCpuTimestampOffset(physical_device), tid);
 
       query_slots_to_reset.push_back(marker.slot_index);
     }

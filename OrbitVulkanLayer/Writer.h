@@ -21,7 +21,8 @@ class Writer {
  public:
   explicit Writer(const std::string& filename) : filename_(std::move(filename)) {}
 
-  void WriteCommandBuffer(uint64_t gpu_begin_ns, uint64_t gpu_end_ns, int64_t gpu_cpu_diff_approx) {
+  void WriteCommandBuffer(uint64_t gpu_begin_ns, uint64_t gpu_end_ns, int64_t gpu_cpu_diff_approx,
+                          int32_t thread_id) {
     LOG("WriteCommandBuffer");
     absl::MutexLock lock(&mutex_);
     orbit_grpc_protos::GpuCommandBuffer command_buffer_event;
@@ -29,6 +30,7 @@ class Writer {
     command_buffer_event.set_approx_begin_cpu_timestamp_ns(gpu_begin_ns + gpu_cpu_diff_approx);
     command_buffer_event.set_end_gpu_timestamp_ns(gpu_end_ns);
     command_buffer_event.set_approx_end_cpu_timestamp_ns(gpu_end_ns + gpu_cpu_diff_approx);
+    command_buffer_event.set_thread_id(thread_id);
 
     WriteMessage(&command_buffer_event);
   }
