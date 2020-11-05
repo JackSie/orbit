@@ -324,7 +324,8 @@ void TimeGraph::ProcessTimer(const TimerInfo& timer_info, const FunctionInfo* fu
       break;
     }
     case TimerInfo::kGpuCommandBuffer: {
-      std::shared_ptr<GpuTrack> track = GetOrCreateGpuTrack(0);
+      uint64_t timeline_hash = timer_info.timeline_hash();
+      std::shared_ptr<GpuTrack> track = GetOrCreateGpuTrack(timeline_hash);
       track->OnTimer(timer_info);
       break;
     }

@@ -189,8 +189,9 @@ message GpuSubmitInfo {
 }
 
 message GpuCommandBuffer {
-  uint64 approx_begin_cpu_timestamp_ns = 2;
-  uint64 approx_end_cpu_timestamp_ns = 4;
+  uint64 approx_begin_cpu_timestamp_ns = 1;
+  uint64 approx_end_cpu_timestamp_ns = 2;
+  uint32 depth = 3;
 }
 
 message CaptureEvent {

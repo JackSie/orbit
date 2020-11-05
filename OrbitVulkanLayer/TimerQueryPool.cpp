@@ -209,15 +209,15 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
     CHECK(event_status == VK_EVENT_RESET);
   }
 
+  uint64_t cpu_timestamp_0 = MonotonicTimestampNs();
   result = dispatch_table_->SetEvent(device)(device, ready_to_write_timestamp_event_0);
   CHECK(result == VK_SUCCESS);
-  uint64_t cpu_timestamp_0 = MonotonicTimestampNs();
 
   std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
+  uint64_t cpu_timestamp_1 = MonotonicTimestampNs();
   result = dispatch_table_->SetEvent(device)(device, ready_to_write_timestamp_event_1);
   CHECK(result == VK_SUCCESS);
-  uint64_t cpu_timestamp_1 = MonotonicTimestampNs();
 
   while (true) {
     VkResult event_status =

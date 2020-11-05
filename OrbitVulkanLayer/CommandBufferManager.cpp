@@ -255,10 +255,11 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
 
         command_buffer_proto->set_approx_begin_cpu_timestamp_ns(begin_timestamp + gpu_cpu_offset);
         command_buffer_proto->set_approx_end_cpu_timestamp_ns(end_timestamp + gpu_cpu_offset);
+        command_buffer_proto->set_depth(ComputeDepthForEvent(begin_timestamp, end_timestamp));
         query_slots_to_reset.push_back(marker.slot_index);
       }
     }
-    writer_->WriteCommandBuffer(submission_proto);
+    writer_->WriteQueueSubmission(submission_proto);
   }
 
   timer_query_pool_->MarkSlotsReadyForReset(device, query_slots_to_reset);

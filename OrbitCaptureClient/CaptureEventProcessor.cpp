@@ -207,14 +207,21 @@ void CaptureEventProcessor::ProcessGpuJob(const GpuJob& gpu_job) {
 
 void CaptureEventProcessor::ProcessGpuQueueSubmission(
     const GpuQueueSubmisssion& gpu_queue_submission) {
+  constexpr const char* timeline_text = "Command Buffers";
+  uint64_t timeline_text_key = GetStringHashAndSendToListenerIfNecessary(timeline_text);
+  constexpr const char* command_buffer_text = "command buffer";
+  uint64_t command_buffer_text_key = GetStringHashAndSendToListenerIfNecessary(command_buffer_text);
   for (const auto& submit_info : gpu_queue_submission.submit_infos()) {
     for (const auto& command_buffer : submit_info.command_buffers()) {
       TimerInfo command_buffer_timer;
       command_buffer_timer.set_start(command_buffer.approx_begin_cpu_timestamp_ns());
       command_buffer_timer.set_end(command_buffer.approx_end_cpu_timestamp_ns());
+      command_buffer_timer.set_depth(command_buffer.depth());
       command_buffer_timer.set_processor(-1);
       command_buffer_timer.set_thread_id(gpu_queue_submission.thread_id());
       command_buffer_timer.set_type(TimerInfo::kGpuCommandBuffer);
+      command_buffer_timer.set_user_data_key(command_buffer_text_key);
+      command_buffer_timer.set_timeline_hash(timeline_text_key);
       capture_listener_->OnTimer(command_buffer_timer);
     }
   }

@@ -15,6 +15,7 @@ using orbit_client_protos::TimerInfo;
 constexpr const char* kSwQueueString = "sw queue";
 constexpr const char* kHwQueueString = "hw queue";
 constexpr const char* kHwExecutionString = "hw execution";
+constexpr const char* kCmdBufferString = "command buffer";
 
 namespace OrbitGl {
 
@@ -110,7 +111,7 @@ float GpuTrack::GetYFromDepth(uint32_t depth) const {
 bool GpuTrack::TimerFilter(const TimerInfo& timer_info) const {
   if (collapse_toggle_->IsCollapsed()) {
     std::string gpu_stage = string_manager_->Get(timer_info.user_data_key()).value_or("");
-    if (gpu_stage != kHwExecutionString) {
+    if (gpu_stage != kHwExecutionString && gpu_stage != kCmdBufferString) {
       return false;
     }
   }
@@ -129,8 +130,7 @@ void GpuTrack::SetTimesliceText(const TimerInfo& timer_info, double elapsed_us, 
           timer_info.type() == TimerInfo::kGpuCommandBuffer);
 
     std::string text = absl::StrFormat(
-        "%s  %s",
-        time_graph_->GetStringManager()->Get(timer_info.user_data_key()).value_or("Command Buffer"),
+        "%s  %s", time_graph_->GetStringManager()->Get(timer_info.user_data_key()).value_or(""),
         time.c_str());
     text_box->SetText(text);
   }

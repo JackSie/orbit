@@ -23,8 +23,8 @@ class Writer {
  public:
   explicit Writer(std::string filename) : filename_(std::move(filename)) {}
 
-  void WriteCommandBuffer(const orbit_grpc_protos::GpuQueueSubmisssion& submisssion) {
-    LOG("WriteCommandBuffer");
+  void WriteQueueSubmission(const orbit_grpc_protos::GpuQueueSubmisssion& submisssion) {
+    LOG("WriteQueueSubmission");
     WriteMessage(submisssion);
   }
 

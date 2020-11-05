@@ -58,6 +58,21 @@ class CommandBufferManager {
   void ResetCommandPool(const VkCommandPool& command_pool);
 
  private:
+  int ComputeDepthForEvent(uint64_t start_timestamp, uint64_t end_timestamp) {
+    for (size_t depth = 0; depth < latest_timestamp_per_depth_.size(); ++depth) {
+      if (start_timestamp >= (latest_timestamp_per_depth_[depth])) {
+        latest_timestamp_per_depth_[depth] = end_timestamp;
+        return depth;
+      }
+    }
+
+    // Note that this vector only grows in size until a certain maximum depth is
+    // reached. Since there are only O(10) events per frame created, the depth
+    // is not likely to grow to a very large size.
+    latest_timestamp_per_depth_.push_back(end_timestamp);
+    return static_cast<int>(latest_timestamp_per_depth_.size() - 1);
+  }
+
   enum MarkerType { kCommandBuffer = 0, kDebugMarker };
 
   struct MarkerState {
@@ -97,6 +112,8 @@ class CommandBufferManager {
   TimerQueryPool* timer_query_pool_;
   PhysicalDeviceManager* physical_device_manager_;
   Writer* writer_;
+
+  std::vector<uint64_t> latest_timestamp_per_depth_;
 
   const OrbitConnector* connector_;
 };
