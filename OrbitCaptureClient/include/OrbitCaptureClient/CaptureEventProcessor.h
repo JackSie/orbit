@@ -38,7 +38,7 @@ class CaptureEventProcessor {
   void ProcessInternedTracepointInfo(
       orbit_grpc_protos::InternedTracepointInfo interned_tracepoint_info);
   void ProcessTracepointEvent(const orbit_grpc_protos::TracepointEvent& tracepoint_event);
-  void ProcessGpuCommandBuffer(const orbit_grpc_protos::GpuCommandBuffer& gpu_command_buffer);
+  void ProcessGpuQueueSubmission(const orbit_grpc_protos::GpuQueueSubmisssion& gpu_command_buffer);
 
   absl::flat_hash_map<uint64_t, orbit_grpc_protos::Callstack> callstack_intern_pool;
   absl::flat_hash_map<uint64_t, std::string> string_intern_pool;

@@ -76,12 +76,14 @@ class CommandBufferManager {
     std::vector<uint32_t> resetting_slot_indices;
   };
 
-  struct SubmittedSubmitInfo {
+  struct SubmitInfo {
     std::vector<SubmittedCommandBuffer> command_buffers;
   };
 
-  struct SubmittedQueue {
-    std::vector<SubmittedSubmitInfo> submitted_submit_infos;
+  struct QueueSubmission {
+    uint64_t cpu_timestamp;
+    int32_t thread_id;
+    std::vector<SubmitInfo> submit_infos;
   };
 
   absl::Mutex mutex_;
@@ -89,7 +91,7 @@ class CommandBufferManager {
   absl::flat_hash_map<VkCommandBuffer, VkDevice> command_buffer_to_device_;
 
   absl::flat_hash_map<VkCommandBuffer, CommandBufferState> command_buffer_to_state_;
-  absl::flat_hash_map<VkQueue, SubmittedQueue> submitted_queues_;
+  absl::flat_hash_map<VkQueue, std::vector<QueueSubmission>> queue_to_submissions_;
 
   DispatchTable* dispatch_table_;
   TimerQueryPool* timer_query_pool_;

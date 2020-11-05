@@ -177,12 +177,20 @@ message AddressInfo {
   }
 }
 
+message GpuQueueSubmisssion {
+  int32 thread_id = 1;
+  uint64 cpu_submission_timestamp = 2;
+  uint64 gpu_cpu_time_offset = 3;
+  repeated GpuSubmitInfo submit_infos = 4;
+}
+
+message GpuSubmitInfo {
+  repeated GpuCommandBuffer command_buffers = 1;
+}
+
 message GpuCommandBuffer {
-  uint64 begin_gpu_timestamp_ns = 1;
   uint64 approx_begin_cpu_timestamp_ns = 2;
-  uint64 end_gpu_timestamp_ns = 3;
   uint64 approx_end_cpu_timestamp_ns = 4;
-  int32 thread_id = 5;
 }
 
 message CaptureEvent {
@@ -199,6 +207,6 @@ message CaptureEvent {
     InternedTracepointInfo interned_tracepoint_info = 9;
     TracepointEvent tracepoint_event = 10;
     IntrospectionScope introspection_scope = 12;
-    GpuCommandBuffer gpu_command_buffer = 13;
+    GpuQueueSubmisssion gpu_queue_submission = 13;
   }
 }

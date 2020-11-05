@@ -4,8 +4,9 @@
 
 #include "TimerQueryPool.h"
 
-#include <chrono>
 #include <thread>
+
+#include "OrbitBase/Profiling.h"
 
 namespace orbit_vulkan_layer {
 void orbit_vulkan_layer::TimerQueryPool::InitializeTimerQueryPool(
@@ -210,13 +211,13 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
 
   result = dispatch_table_->SetEvent(device)(device, ready_to_write_timestamp_event_0);
   CHECK(result == VK_SUCCESS);
-  std::chrono::steady_clock::time_point cpu_timestamp_0 = std::chrono::steady_clock::now();
+  uint64_t cpu_timestamp_0 = MonotonicTimestampNs();
 
   std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
   result = dispatch_table_->SetEvent(device)(device, ready_to_write_timestamp_event_1);
   CHECK(result == VK_SUCCESS);
-  std::chrono::steady_clock::time_point cpu_timestamp_1 = std::chrono::steady_clock::now();
+  uint64_t cpu_timestamp_1 = MonotonicTimestampNs();
 
   while (true) {
     VkResult event_status =
@@ -274,18 +275,16 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
   gpu_timestamp_1 = static_cast<uint64_t>(static_cast<double>(gpu_timestamp_1) *
                                           properties.limits.timestampPeriod);
 
-  int64_t offset_0 = cpu_timestamp_0.time_since_epoch().count() - gpu_timestamp_0;
-  int64_t offset_1 = cpu_timestamp_1.time_since_epoch().count() - gpu_timestamp_1;
+  int64_t offset_0 = cpu_timestamp_0 - gpu_timestamp_0;
+  int64_t offset_1 = cpu_timestamp_1 - gpu_timestamp_1;
   int64_t approx_offset = (offset_0 + offset_1) / 2;
 
   physical_device_manager_->RegisterApproxCpuTimestampOffset(physical_device, approx_offset);
 
-  LOG("DIFF GPU / CPU 1: %ld ns", gpu_timestamp_0 - cpu_timestamp_0.time_since_epoch().count());
-  LOG("DIFF GPU / CPU 2: %ld ns", gpu_timestamp_1 - cpu_timestamp_1.time_since_epoch().count());
+  LOG("DIFF GPU / CPU 1: %ld ns", cpu_timestamp_0 - gpu_timestamp_0);
+  LOG("DIFF GPU / CPU 2: %ld ns", cpu_timestamp_1 - gpu_timestamp_1);
   LOG("GPU Timerange: %lu ns", gpu_timestamp_1 - gpu_timestamp_0);
-  LOG("CPU Timerange: %lu ns",
-      std::chrono::duration_cast<std::chrono::nanoseconds>(cpu_timestamp_1 - cpu_timestamp_0)
-          .count());
+  LOG("CPU Timerange: %lu ns", cpu_timestamp_1 - cpu_timestamp_0);
 }
 
 bool TimerQueryPool::NextReadyQuerySlot(const VkDevice& device, uint32_t* allocated_index) {

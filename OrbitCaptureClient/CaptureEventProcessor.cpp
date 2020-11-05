@@ -19,8 +19,8 @@ using orbit_grpc_protos::Callstack;
 using orbit_grpc_protos::CallstackSample;
 using orbit_grpc_protos::CaptureEvent;
 using orbit_grpc_protos::FunctionCall;
-using orbit_grpc_protos::GpuCommandBuffer;
 using orbit_grpc_protos::GpuJob;
+using orbit_grpc_protos::GpuQueueSubmisssion;
 using orbit_grpc_protos::InternedCallstack;
 using orbit_grpc_protos::InternedString;
 using orbit_grpc_protos::IntrospectionScope;
@@ -66,8 +66,8 @@ void CaptureEventProcessor::ProcessEvent(const CaptureEvent& event) {
     case CaptureEvent::kTracepointEvent:
       ProcessTracepointEvent(event.tracepoint_event());
       break;
-    case CaptureEvent::kGpuCommandBuffer:
-      ProcessGpuCommandBuffer(event.gpu_command_buffer());
+    case CaptureEvent::kGpuQueueSubmission:
+      ProcessGpuQueueSubmission(event.gpu_queue_submission());
       break;
     case CaptureEvent::EVENT_NOT_SET:
       ERROR("CaptureEvent::EVENT_NOT_SET read from Capture's gRPC stream");
@@ -205,14 +205,19 @@ void CaptureEventProcessor::ProcessGpuJob(const GpuJob& gpu_job) {
   capture_listener_->OnTimer(std::move(timer_start_to_finish));
 }
 
-void CaptureEventProcessor::ProcessGpuCommandBuffer(const GpuCommandBuffer& gpu_command_buffer) {
-  TimerInfo command_buffer_timer;
-  command_buffer_timer.set_start(gpu_command_buffer.approx_begin_cpu_timestamp_ns());
-  command_buffer_timer.set_end(gpu_command_buffer.approx_end_cpu_timestamp_ns());
-  command_buffer_timer.set_processor(-1);
-  command_buffer_timer.set_thread_id(gpu_command_buffer.thread_id());
-  command_buffer_timer.set_type(TimerInfo::kGpuCommandBuffer);
-  capture_listener_->OnTimer(command_buffer_timer);
+void CaptureEventProcessor::ProcessGpuQueueSubmission(
+    const GpuQueueSubmisssion& gpu_queue_submission) {
+  for (const auto& submit_info : gpu_queue_submission.submit_infos()) {
+    for (const auto& command_buffer : submit_info.command_buffers()) {
+      TimerInfo command_buffer_timer;
+      command_buffer_timer.set_start(command_buffer.approx_begin_cpu_timestamp_ns());
+      command_buffer_timer.set_end(command_buffer.approx_end_cpu_timestamp_ns());
+      command_buffer_timer.set_processor(-1);
+      command_buffer_timer.set_thread_id(gpu_queue_submission.thread_id());
+      command_buffer_timer.set_type(TimerInfo::kGpuCommandBuffer);
+      capture_listener_->OnTimer(command_buffer_timer);
+    }
+  }
 }
 
 void CaptureEventProcessor::ProcessThreadName(const ThreadName& thread_name) {
