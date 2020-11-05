@@ -16,7 +16,6 @@ target_include_directories(OrbitVulkanLayer PRIVATE
 target_sources(OrbitVulkanLayer PRIVATE
         CommandBufferManager.cpp
         CommandBufferManager.h
-        DispatchTable.cpp
         DispatchTable.h
         Main.cpp
         LayerLogic.cpp
@@ -25,11 +24,10 @@ target_sources(OrbitVulkanLayer PRIVATE
         OrbitConnector.h
         PhysicalDeviceManager.cpp
         PhysicalDeviceManager.h
-        QueueManager.cpp
         QueueFamilyInfoManager.cpp
-        QueueFamilyInfoManager.cpp
+        QueueFamilyInfoManager.h
         QueueManager.cpp
-        QueueManager.cpp
+        QueueManager.h
         TimerQueryPool.cpp
         TimerQueryPool.h
         Writer.cpp

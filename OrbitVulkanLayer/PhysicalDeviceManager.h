@@ -16,11 +16,13 @@ namespace orbit_vulkan_layer {
 class PhysicalDeviceManager {
  public:
   explicit PhysicalDeviceManager(DispatchTable* dispatch_table) : dispatch_table_(dispatch_table) {}
-  void TrackPhysicalDevices(const VkInstance& instance, uint32_t* physical_device_count,
-                            VkPhysicalDevice* physical_devices);
-  void TrackLogicalDevice(const VkDevice& device, const VkPhysicalDevice& physical_device) {
+
+  void TrackPhysicalDevice(const VkPhysicalDevice& physical_device, const VkDevice& device) {
     absl::WriterMutexLock lock(&mutex_);
     device_to_physical_device_[device] = physical_device;
+    VkPhysicalDeviceProperties properties;
+    dispatch_table_->GetPhysicalDeviceProperties(physical_device)(physical_device, &properties);
+    physical_device_to_properties_[physical_device] = properties;
   }
 
   [[nodiscard]] VkPhysicalDevice GetPhysicalDeviceOfLogicalDevice(const VkDevice& device) {
@@ -47,14 +49,12 @@ class PhysicalDeviceManager {
     return physical_device_to_approx_cpu_time_offset_.at(physical_device);
   }
 
-  [[nodiscard]] VkInstance GetInstanceOfPhysicalDevice(const VkPhysicalDevice& device);
   [[nodiscard]] VkPhysicalDeviceProperties GetPhysicalDeviceProperties(
       const VkPhysicalDevice& physical_device);
 
  private:
   absl::Mutex mutex_;
   DispatchTable* dispatch_table_;
-  absl::flat_hash_map<VkPhysicalDevice, VkInstance> physical_device_to_instance_;
   absl::flat_hash_map<VkPhysicalDevice, VkPhysicalDeviceProperties> physical_device_to_properties_;
   absl::flat_hash_map<VkDevice, VkPhysicalDevice> device_to_physical_device_;
   absl::flat_hash_map<VkPhysicalDevice, int64_t> physical_device_to_approx_cpu_time_offset_;

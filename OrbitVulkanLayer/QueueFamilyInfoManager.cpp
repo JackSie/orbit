@@ -6,18 +6,17 @@
 void orbit_vulkan_layer::QueueFamilyInfoManager::InitializeQueueFamilyInfo(
     const VkPhysicalDevice& device) {
   LOG("InitializeQueueFamilyInfo");
-  VkInstance instance = physical_device_manager_->GetInstanceOfPhysicalDevice(device);
 
   // We need to know the count of properties first, before the actual query.
   uint32_t properties_count = 0;
-  dispatch_table_->GetPhysicalDeviceQueueFamilyProperties(instance)(device, &properties_count,
-                                                                    nullptr);
+  dispatch_table_->GetPhysicalDeviceQueueFamilyProperties(device)(device, &properties_count,
+                                                                  nullptr);
   CHECK(properties_count > 0);
 
   std::vector<VkQueueFamilyProperties> queue_family_properties;
   queue_family_properties.resize(properties_count);
-  dispatch_table_->GetPhysicalDeviceQueueFamilyProperties(instance)(device, &properties_count,
-                                                                    queue_family_properties.data());
+  dispatch_table_->GetPhysicalDeviceQueueFamilyProperties(device)(device, &properties_count,
+                                                                  queue_family_properties.data());
 
   const VkQueueFlags reset_query_pool_supported_flags =
       VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;

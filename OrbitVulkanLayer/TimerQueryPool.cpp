@@ -128,11 +128,12 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
                                       .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
                                       .pInheritanceInfo = nullptr};
 
-  result = dispatch_table_->BeginCommandBuffer(device)(reset_command_buffer, &begin_info);
+  result =
+      dispatch_table_->BeginCommandBuffer(reset_command_buffer)(reset_command_buffer, &begin_info);
   CHECK(result == VK_SUCCESS);
 
-  dispatch_table_->CmdResetQueryPool(device)(reset_command_buffer, query_pool, 0,
-                                             kNumPhysicalTimerQuerySlots);
+  dispatch_table_->CmdResetQueryPool(reset_command_buffer)(reset_command_buffer, query_pool, 0,
+                                                           kNumPhysicalTimerQuerySlots);
 
   dispatch_table_->CmdPipelineBarrier(device)(
       reset_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -145,8 +146,8 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
   dispatch_table_->CmdWaitEvents(device)(
       reset_command_buffer, 1, &ready_to_write_timestamp_event_0, VK_PIPELINE_STAGE_HOST_BIT,
       VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, nullptr, 0, nullptr, 0, nullptr);
-  dispatch_table_->CmdWriteTimestamp(device)(reset_command_buffer,
-                                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool, 0);
+  dispatch_table_->CmdWriteTimestamp(reset_command_buffer)(
+      reset_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool, 0);
   dispatch_table_->CmdPipelineBarrier(device)(
       reset_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
       0, 1, &memory_barrier, 0, nullptr, 0, nullptr);
@@ -156,8 +157,8 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
   dispatch_table_->CmdPipelineBarrier(device)(
       reset_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
       0, 1, &memory_barrier, 0, nullptr, 0, nullptr);
-  dispatch_table_->CmdWriteTimestamp(device)(reset_command_buffer,
-                                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool, 1);
+  dispatch_table_->CmdWriteTimestamp(reset_command_buffer)(
+      reset_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool, 1);
   dispatch_table_->CmdPipelineBarrier(device)(
       reset_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
       0, 1, &memory_barrier, 0, nullptr, 0, nullptr);
@@ -172,8 +173,8 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
   dispatch_table_->CmdPipelineBarrier(device)(
       reset_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
       0, 1, &memory_barrier, 0, nullptr, 0, nullptr);
-  dispatch_table_->CmdResetQueryPool(device)(reset_command_buffer, query_pool, 0, 2);
-  result = dispatch_table_->EndCommandBuffer(device)(reset_command_buffer);
+  dispatch_table_->CmdResetQueryPool(reset_command_buffer)(reset_command_buffer, query_pool, 0, 2);
+  result = dispatch_table_->EndCommandBuffer(reset_command_buffer)(reset_command_buffer);
   CHECK(result == VK_SUCCESS);
 
   VkFence reset_fence = VK_NULL_HANDLE;
@@ -263,6 +264,8 @@ void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
   dispatch_table_->DestroyEvent(device)(device, reset_done_event, nullptr);
   dispatch_table_->DestroyEvent(device)(device, ready_to_write_timestamp_event_0, nullptr);
   dispatch_table_->DestroyEvent(device)(device, ready_to_write_timestamp_event_1, nullptr);
+  dispatch_table_->DestroyEvent(device)(device, write_timestamps_done_event, nullptr);
+  dispatch_table_->DestroyEvent(device)(device, read_timestamps_done_event, nullptr);
 
   VkPhysicalDeviceProperties properties =
       physical_device_manager_->GetPhysicalDeviceProperties(physical_device);

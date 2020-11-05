@@ -93,7 +93,7 @@ void LayerLogic::PostCallCreateDevice(VkPhysicalDevice physical_device,
                                       const VkAllocationCallbacks* /*allocator*/,
                                       VkDevice* device) {
   LOG("PostCallCreateDevice");
-  physical_device_manager_.TrackLogicalDevice(*device, physical_device);
+  physical_device_manager_.TrackPhysicalDevice(physical_device, *device);
   queue_family_info_manager_.InitializeQueueFamilyInfo(physical_device);
   timer_query_pool_.InitializeTimerQueryPool(*device, physical_device);
 }
@@ -101,22 +101,10 @@ void LayerLogic::PostCallCreateDevice(VkPhysicalDevice physical_device,
 void LayerLogic::PostCallDestroyDevice(VkDevice device,
                                        const VkAllocationCallbacks* /*allocator*/) {
   LOG("PostCallDestroyDevice");
+  queue_family_info_manager_.RemoveQueueFamilyInfo(
+      physical_device_manager_.GetPhysicalDeviceOfLogicalDevice(device));
   physical_device_manager_.UntrackLogicalDevice(device);
   dispatch_table_.RemoveDeviceDispatchTable(device);
-}
-
-void LayerLogic::PostCallCreateCommandPool(VkDevice /*device*/,
-                                           const VkCommandPoolCreateInfo* /*create_info*/,
-                                           const VkAllocationCallbacks* /*allocator*/,
-                                           VkCommandPool* command_pool) {
-  LOG("PostCallCreateCommandPool");
-  command_buffer_manager_.TrackCommandPool(*command_pool);
-}
-
-void LayerLogic::PostCallDestroyCommandPool(VkDevice /*device*/, VkCommandPool command_pool,
-                                            const VkAllocationCallbacks* /*allocator*/) {
-  LOG("PostCallDestroyCommandPool");
-  command_buffer_manager_.UntrackCommandPool(command_pool);
 }
 
 void LayerLogic::PostCallResetCommandPool(VkDevice /*device*/, VkCommandPool command_pool,
@@ -169,6 +157,7 @@ void LayerLogic::PostCallQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* 
   LOG("PostCallQueuePresentKHR");
   command_buffer_manager_.CompleteSubmits(queue_manager_.GetDeviceOfQueue(queue));
 }
+
 void LayerLogic::PostCallGetDeviceQueue(VkDevice device, uint32_t /*queue_family_index*/,
                                         uint32_t /*queue_index*/, VkQueue* queue) {
   LOG("PostCallGetDeviceQueue");
@@ -178,13 +167,6 @@ void LayerLogic::PostCallGetDeviceQueue2(VkDevice device, const VkDeviceQueueInf
                                          VkQueue* queue) {
   LOG("PostCallGetDeviceQueue2");
   queue_manager_.TrackQueue(*queue, device);
-}
-
-void LayerLogic::PostCallEnumeratePhysicalDevices(VkInstance instance,
-                                                  uint32_t* physical_device_count,
-                                                  VkPhysicalDevice* physical_devices) {
-  LOG("PostCallEnumeratePhysicalDevices");
-  physical_device_manager_.TrackPhysicalDevices(instance, physical_device_count, physical_devices);
 }
 
 }  // namespace orbit_vulkan_layer

@@ -5,6 +5,7 @@
 #ifndef ORBIT_VULKAN_LAYER_DISPATCH_TABLE_H_
 #define ORBIT_VULKAN_LAYER_DISPATCH_TABLE_H_
 
+#include "OrbitBase/Logging.h"
 #include "absl/base/casts.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -26,63 +27,400 @@ namespace orbit_vulkan_layer {
 class DispatchTable {
  public:
   DispatchTable() = default;
+
   void CreateInstanceDispatchTable(
       const VkInstance& instance,
-      const PFN_vkGetInstanceProcAddr& next_get_instance_proc_addr_function);
-  void RemoveInstanceDispatchTable(const VkInstance& instance);
+      const PFN_vkGetInstanceProcAddr& next_get_instance_proc_addr_function) {
+    VkLayerInstanceDispatchTable dispatch_table;
+    dispatch_table.DestroyInstance = absl::bit_cast<PFN_vkDestroyInstance>(
+        next_get_instance_proc_addr_function(instance, "vkDestroyInstance"));
+    dispatch_table.GetInstanceProcAddr = absl::bit_cast<PFN_vkGetInstanceProcAddr>(
+        next_get_instance_proc_addr_function(instance, "vkGetInstanceProcAddr"));
+    dispatch_table.EnumerateDeviceExtensionProperties =
+        absl::bit_cast<PFN_vkEnumerateDeviceExtensionProperties>(
+            next_get_instance_proc_addr_function(instance, "vkEnumerateDeviceExtensionProperties"));
+    dispatch_table.GetPhysicalDeviceQueueFamilyProperties =
+        absl::bit_cast<PFN_vkGetPhysicalDeviceQueueFamilyProperties>(
+            next_get_instance_proc_addr_function(instance,
+                                                 "vkGetPhysicalDeviceQueueFamilyProperties"));
+    dispatch_table.GetPhysicalDeviceProperties = absl::bit_cast<PFN_vkGetPhysicalDeviceProperties>(
+        next_get_instance_proc_addr_function(instance, "vkGetPhysicalDeviceProperties"));
+
+    {
+      absl::WriterMutexLock lock(&mutex_);
+      instance_dispatch_table_[GetDispatchTableKey(instance)] = dispatch_table;
+    }
+  }
+
+  void RemoveInstanceDispatchTable(const VkInstance& instance) {
+    absl::WriterMutexLock lock(&mutex_);
+    instance_dispatch_table_.erase(GetDispatchTableKey(instance));
+  }
+
   void CreateDeviceDispatchTable(const VkDevice& device,
-                                 const PFN_vkGetDeviceProcAddr& next_get_device_proc_add_function);
-  void RemoveDeviceDispatchTable(const VkDevice& device);
+                                 const PFN_vkGetDeviceProcAddr& next_get_device_proc_add_function) {
+    VkLayerDispatchTable dispatch_table;
 
-  [[nodiscard]] PFN_vkDestroyInstance DestroyInstance(const VkInstance& instance);
-  [[nodiscard]] PFN_vkDestroyDevice DestroyDevice(const VkDevice& device);
+    dispatch_table.GetDeviceProcAddr = absl::bit_cast<PFN_vkGetDeviceProcAddr>(
+        next_get_device_proc_add_function(device, "vkGetDeviceProcAddr"));
 
-  [[nodiscard]] PFN_vkEnumerateDeviceExtensionProperties EnumerateDeviceExtensionProperties(
-      const VkInstance& instance);
-  [[nodiscard]] PFN_vkEnumeratePhysicalDevices EnumeratePhysicalDevices(const VkInstance& instance);
-  [[nodiscard]] PFN_vkGetPhysicalDeviceQueueFamilyProperties GetPhysicalDeviceQueueFamilyProperties(
-      const VkInstance& instance);
-  [[nodiscard]] PFN_vkGetPhysicalDeviceProperties GetPhysicalDeviceProperties(
-      const VkInstance& instance);
+    dispatch_table.CreateCommandPool = absl::bit_cast<PFN_vkCreateCommandPool>(
+        next_get_device_proc_add_function(device, "vkCreateCommandPool"));
+    dispatch_table.DestroyCommandPool = absl::bit_cast<PFN_vkDestroyCommandPool>(
+        next_get_device_proc_add_function(device, "vkDestroyCommandPool"));
+    dispatch_table.ResetCommandPool = absl::bit_cast<PFN_vkResetCommandPool>(
+        next_get_device_proc_add_function(device, "vkResetCommandPool"));
 
-  [[nodiscard]] PFN_vkGetInstanceProcAddr GetInstanceProcAddr(const VkInstance& instance);
-  [[nodiscard]] PFN_vkGetDeviceProcAddr GetDeviceProcAddr(const VkDevice& device);
+    dispatch_table.AllocateCommandBuffers = absl::bit_cast<PFN_vkAllocateCommandBuffers>(
+        next_get_device_proc_add_function(device, "vkAllocateCommandBuffers"));
+    dispatch_table.FreeCommandBuffers = absl::bit_cast<PFN_vkFreeCommandBuffers>(
+        next_get_device_proc_add_function(device, "vkFreeCommandBuffers"));
+    dispatch_table.BeginCommandBuffer = absl::bit_cast<PFN_vkBeginCommandBuffer>(
+        next_get_device_proc_add_function(device, "vkBeginCommandBuffer"));
+    dispatch_table.EndCommandBuffer = absl::bit_cast<PFN_vkEndCommandBuffer>(
+        next_get_device_proc_add_function(device, "vkEndCommandBuffer"));
+    dispatch_table.ResetCommandBuffer = absl::bit_cast<PFN_vkResetCommandBuffer>(
+        next_get_device_proc_add_function(device, "vkResetCommandBuffer"));
 
-  [[nodiscard]] PFN_vkCreateCommandPool CreateCommandPool(const VkDevice& device);
-  [[nodiscard]] PFN_vkDestroyCommandPool DestroyCommandPool(const VkDevice& device);
-  [[nodiscard]] PFN_vkResetCommandPool ResetCommandPool(const VkDevice& device);
+    dispatch_table.QueueSubmit = absl::bit_cast<PFN_vkQueueSubmit>(
+        next_get_device_proc_add_function(device, "vkQueueSubmit"));
+    dispatch_table.QueuePresentKHR = absl::bit_cast<PFN_vkQueuePresentKHR>(
+        next_get_device_proc_add_function(device, "vkQueuePresentKHR"));
 
-  [[nodiscard]] PFN_vkAllocateCommandBuffers AllocateCommandBuffers(const VkDevice& device);
-  [[nodiscard]] PFN_vkFreeCommandBuffers FreeCommandBuffers(const VkDevice& device);
-  [[nodiscard]] PFN_vkBeginCommandBuffer BeginCommandBuffer(const VkDevice& device);
-  [[nodiscard]] PFN_vkEndCommandBuffer EndCommandBuffer(const VkDevice& device);
-  [[nodiscard]] PFN_vkResetCommandBuffer ResetCommandBuffer(const VkDevice& device);
+    dispatch_table.GetDeviceQueue = absl::bit_cast<PFN_vkGetDeviceQueue>(
+        next_get_device_proc_add_function(device, "vkGetDeviceQueue"));
+    dispatch_table.GetDeviceQueue2 = absl::bit_cast<PFN_vkGetDeviceQueue2>(
+        next_get_device_proc_add_function(device, "vkGetDeviceQueue2"));
 
-  [[nodiscard]] PFN_vkCmdWriteTimestamp CmdWriteTimestamp(const VkDevice& device);
+    dispatch_table.CreateQueryPool = absl::bit_cast<PFN_vkCreateQueryPool>(
+        next_get_device_proc_add_function(device, "vkCreateQueryPool"));
+    dispatch_table.CmdResetQueryPool = absl::bit_cast<PFN_vkCmdResetQueryPool>(
+        next_get_device_proc_add_function(device, "vkCmdResetQueryPool"));
 
-  [[nodiscard]] PFN_vkGetDeviceQueue GetDeviceQueue(const VkDevice& device);
-  [[nodiscard]] PFN_vkGetDeviceQueue2 GetDeviceQueue2(const VkDevice& device);
-  [[nodiscard]] PFN_vkQueueSubmit QueueSubmit(const VkDevice& device);
-  [[nodiscard]] PFN_vkQueuePresentKHR QueuePresentKHR(const VkDevice& device);
+    dispatch_table.CmdWriteTimestamp = absl::bit_cast<PFN_vkCmdWriteTimestamp>(
+        next_get_device_proc_add_function(device, "vkCmdWriteTimestamp"));
 
-  [[nodiscard]] PFN_vkCreateQueryPool CreateQueryPool(const VkDevice& device);
-  [[nodiscard]] PFN_vkCmdResetQueryPool CmdResetQueryPool(const VkDevice& device);
-  [[nodiscard]] PFN_vkGetQueryPoolResults GetQueryPoolResults(const VkDevice& device);
+    dispatch_table.CmdBeginQuery = absl::bit_cast<PFN_vkCmdBeginQuery>(
+        next_get_device_proc_add_function(device, "vkCmdBeginQuery"));
+    dispatch_table.CmdEndQuery = absl::bit_cast<PFN_vkCmdEndQuery>(
+        next_get_device_proc_add_function(device, "vkCmdEndQuery"));
+    dispatch_table.GetQueryPoolResults = absl::bit_cast<PFN_vkGetQueryPoolResults>(
+        next_get_device_proc_add_function(device, "vkGetQueryPoolResults"));
 
-  [[nodiscard]] PFN_vkCmdPipelineBarrier CmdPipelineBarrier(const VkDevice& device);
+    dispatch_table.CreateFence = absl::bit_cast<PFN_vkCreateFence>(
+        next_get_device_proc_add_function(device, "vkCreateFence"));
+    dispatch_table.DestroyFence = absl::bit_cast<PFN_vkDestroyFence>(
+        next_get_device_proc_add_function(device, "vkDestroyFence"));
+    dispatch_table.GetFenceStatus = absl::bit_cast<PFN_vkGetFenceStatus>(
+        next_get_device_proc_add_function(device, "vkGetFenceStatus"));
 
-  [[nodiscard]] PFN_vkCreateFence CreateFence(const VkDevice& device);
-  [[nodiscard]] PFN_vkDestroyFence DestroyFence(const VkDevice& device);
-  [[nodiscard]] PFN_vkGetFenceStatus GetFenceStatus(const VkDevice& device);
+    dispatch_table.CreateEvent = absl::bit_cast<PFN_vkCreateEvent>(
+        next_get_device_proc_add_function(device, "vkCreateEvent"));
+    dispatch_table.DestroyEvent = absl::bit_cast<PFN_vkDestroyEvent>(
+        next_get_device_proc_add_function(device, "vkDestroyEvent"));
+    dispatch_table.SetEvent =
+        absl::bit_cast<PFN_vkSetEvent>(next_get_device_proc_add_function(device, "vkSetEvent"));
+    dispatch_table.GetEventStatus = absl::bit_cast<PFN_vkGetEventStatus>(
+        next_get_device_proc_add_function(device, "vkGetEventStatus"));
+    dispatch_table.CmdWaitEvents = absl::bit_cast<PFN_vkCmdWaitEvents>(
+        next_get_device_proc_add_function(device, "vkCmdWaitEvents"));
+    dispatch_table.CmdSetEvent = absl::bit_cast<PFN_vkCmdSetEvent>(
+        next_get_device_proc_add_function(device, "vkCmdSetEvent"));
 
-  [[nodiscard]] PFN_vkCreateEvent CreateEvent(const VkDevice& device);
-  [[nodiscard]] PFN_vkDestroyEvent DestroyEvent(const VkDevice& device);
-  [[nodiscard]] PFN_vkSetEvent SetEvent(const VkDevice& device);
-  [[nodiscard]] PFN_vkGetEventStatus GetEventStatus(const VkDevice& device);
-  [[nodiscard]] PFN_vkCmdWaitEvents CmdWaitEvents(const VkDevice& device);
-  [[nodiscard]] PFN_vkCmdSetEvent CmdSetEvent(const VkDevice& device);
+    dispatch_table.CmdPipelineBarrier = absl::bit_cast<PFN_vkCmdPipelineBarrier>(
+        next_get_device_proc_add_function(device, "vkCmdPipelineBarrier"));
+
+    {
+      absl::WriterMutexLock lock(&mutex_);
+      device_dispatch_table_[GetDispatchTableKey(device)] = dispatch_table;
+    }
+  }
+
+  void RemoveDeviceDispatchTable(const VkDevice& device) {
+    absl::WriterMutexLock lock(&mutex_);
+    device_dispatch_table_.erase(GetDispatchTableKey(device));
+  }
+
+  template <typename DispatchableType>
+  PFN_vkDestroyDevice DestroyDevice(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).DestroyDevice;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkDestroyInstance DestroyInstance(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(instance_dispatch_table_.contains(key));
+    return instance_dispatch_table_.at(key).DestroyInstance;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkEnumerateDeviceExtensionProperties EnumerateDeviceExtensionProperties(
+      const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(instance_dispatch_table_.contains(key));
+    return instance_dispatch_table_.at(key).EnumerateDeviceExtensionProperties;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkGetPhysicalDeviceQueueFamilyProperties GetPhysicalDeviceQueueFamilyProperties(
+      const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(instance_dispatch_table_.contains(key));
+    return instance_dispatch_table_.at(key).GetPhysicalDeviceQueueFamilyProperties;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkGetPhysicalDeviceProperties GetPhysicalDeviceProperties(
+      const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(instance_dispatch_table_.contains(key));
+    return instance_dispatch_table_.at(key).GetPhysicalDeviceProperties;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkGetInstanceProcAddr GetInstanceProcAddr(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(instance_dispatch_table_.contains(key));
+    return instance_dispatch_table_.at(key).GetInstanceProcAddr;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkGetDeviceProcAddr GetDeviceProcAddr(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).GetDeviceProcAddr;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkCreateCommandPool CreateCommandPool(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).CreateCommandPool;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkDestroyCommandPool DestroyCommandPool(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).DestroyCommandPool;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkResetCommandPool ResetCommandPool(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).ResetCommandPool;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkAllocateCommandBuffers AllocateCommandBuffers(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).AllocateCommandBuffers;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkFreeCommandBuffers FreeCommandBuffers(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).FreeCommandBuffers;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkBeginCommandBuffer BeginCommandBuffer(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).BeginCommandBuffer;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkEndCommandBuffer EndCommandBuffer(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).EndCommandBuffer;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkResetCommandBuffer ResetCommandBuffer(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).ResetCommandBuffer;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkGetDeviceQueue GetDeviceQueue(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).GetDeviceQueue;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkGetDeviceQueue2 GetDeviceQueue2(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).GetDeviceQueue2;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkQueueSubmit QueueSubmit(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).QueueSubmit;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkQueuePresentKHR QueuePresentKHR(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).QueuePresentKHR;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkCreateQueryPool CreateQueryPool(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).CreateQueryPool;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkCmdResetQueryPool CmdResetQueryPool(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).CmdResetQueryPool;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkGetQueryPoolResults GetQueryPoolResults(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).GetQueryPoolResults;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkCreateFence CreateFence(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).CreateFence;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkDestroyFence DestroyFence(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).DestroyFence;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkGetFenceStatus GetFenceStatus(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).GetFenceStatus;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkCmdWriteTimestamp CmdWriteTimestamp(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).CmdWriteTimestamp;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkCreateEvent CreateEvent(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).CreateEvent;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkDestroyEvent DestroyEvent(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).DestroyEvent;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkSetEvent SetEvent(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).SetEvent;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkGetEventStatus GetEventStatus(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).GetEventStatus;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkCmdWaitEvents CmdWaitEvents(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).CmdWaitEvents;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkCmdSetEvent CmdSetEvent(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).CmdSetEvent;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkCmdPipelineBarrier CmdPipelineBarrier(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).CmdPipelineBarrier;
+  }
 
  private:
+  /*
+   * In vulkan, every "dispatchable type" has as a very first field in memory a pointer to the
+   * internal dispatch table. This pointer is unique per device/instance. So for example
+   * for a command buffer allocated on a certain device, this pointer is the same for the buffer
+   * and for the device. So we can use that pointer to uniquely map dispatchable types to their
+   * dispatch table.
+   */
+  template <typename DispatchableType>
+  void* GetDispatchTableKey(DispatchableType dispatchable_object) {
+    return *absl::bit_cast<void**>(dispatchable_object);
+  }
+
   // Dispatch tables required for routing instance and device calls onto the next
   // layer in the dispatch chain among our handling of functions we intercept.
   absl::flat_hash_map<void*, VkLayerInstanceDispatchTable> instance_dispatch_table_;

@@ -12,41 +12,19 @@
 
 namespace orbit_vulkan_layer {
 
-void CommandBufferManager::TrackCommandPool(VkCommandPool pool) {
-  LOG("TrackCommandPool");
-  absl::WriterMutexLock lock(&mutex_);
-  tracked_pools_.insert(pool);
-  pool_to_command_buffers_[pool] = {};
-}
-
-void CommandBufferManager::UntrackCommandPool(VkCommandPool pool) {
-  LOG("UntrackCommandPool");
-  absl::WriterMutexLock lock(&mutex_);
-  CHECK(tracked_pools_.contains(pool));
-
-  // Remove the command buffers associated with this pool:
-  for (const VkCommandBuffer& command_buffer : pool_to_command_buffers_.at(pool)) {
-    CHECK(command_buffer != VK_NULL_HANDLE);
-    CHECK(command_buffer_to_device_.contains(command_buffer));
-    tracked_command_buffers_.erase(command_buffer);
-  }
-  pool_to_command_buffers_.erase(pool);
-  tracked_pools_.erase(pool);
-}
-
 void CommandBufferManager::TrackCommandBuffers(VkDevice device, VkCommandPool pool,
                                                const VkCommandBuffer* command_buffers,
                                                uint32_t count) {
   LOG("TrackCommandBuffers");
   absl::WriterMutexLock lock(&mutex_);
-  CHECK(tracked_pools_.contains(pool));
-  // Create that entry if it does not exist yet.
+  if (!pool_to_command_buffers_.contains(pool)) {
+    pool_to_command_buffers_[pool] = {};
+  }
   absl::flat_hash_set<VkCommandBuffer>& associated_cbs = pool_to_command_buffers_.at(pool);
   for (uint32_t i = 0; i < count; ++i) {
     const VkCommandBuffer& cb = command_buffers[i];
     CHECK(cb != VK_NULL_HANDLE);
     associated_cbs.insert(cb);
-    tracked_command_buffers_.insert(cb);
     command_buffer_to_device_[cb] = device;
   }
 }
@@ -56,39 +34,19 @@ void CommandBufferManager::UntrackCommandBuffers(VkDevice device, VkCommandPool 
                                                  uint32_t count) {
   LOG("UntrackCommandBuffers");
   absl::WriterMutexLock lock(&mutex_);
-  CHECK(tracked_pools_.contains(pool));
   absl::flat_hash_set<VkCommandBuffer>& associated_command_buffers =
       pool_to_command_buffers_.at(pool);
   for (uint32_t i = 0; i < count; ++i) {
     const VkCommandBuffer& command_buffer = command_buffers[i];
     CHECK(command_buffer != VK_NULL_HANDLE);
-    CHECK(command_buffer_to_device_.contains(command_buffer));
     associated_command_buffers.erase(command_buffer);
-    tracked_command_buffers_.erase(command_buffer);
     CHECK(command_buffer_to_device_.contains(command_buffer));
     CHECK(command_buffer_to_device_.at(command_buffer) == device);
     command_buffer_to_device_.erase(command_buffer);
   }
-}
-
-bool CommandBufferManager::IsCommandPoolTracked(const VkCommandPool& pool) {
-  LOG("IsCommandPoolTracked");
-  absl::ReaderMutexLock lock(&mutex_);
-  return tracked_pools_.contains(pool);
-}
-
-bool CommandBufferManager::IsCommandBufferTracked(const VkCommandBuffer& command_buffer) {
-  LOG("IsCommandBufferTracked");
-  absl::ReaderMutexLock lock(&mutex_);
-  return tracked_command_buffers_.find(command_buffer) != tracked_command_buffers_.end();
-}
-
-const VkDevice& CommandBufferManager::GetDeviceOfCommandBuffer(
-    const VkCommandBuffer& command_buffer) {
-  LOG("GetDeviceOfCommandBuffer");
-  absl::ReaderMutexLock lock(&mutex_);
-  CHECK(command_buffer_to_device_.contains(command_buffer));
-  return command_buffer_to_device_.at(command_buffer);
+  if (associated_command_buffers.empty()) {
+    pool_to_command_buffers_.erase(pool);
+  }
 }
 
 void CommandBufferManager::MarkCommandBufferBegin(const VkCommandBuffer& command_buffer) {
@@ -111,15 +69,16 @@ void CommandBufferManager::MarkCommandBufferBegin(const VkCommandBuffer& command
     base_slots_to_reset = timer_query_pool_->PullSlotsToReset(device);
     CHECK(!base_slots_to_reset.empty());
     for (uint32_t base_slot_to_reset : base_slots_to_reset) {
-      dispatch_table_->CmdResetQueryPool(device)(command_buffer, query_pool, base_slot_to_reset, 2);
+      dispatch_table_->CmdResetQueryPool(command_buffer)(command_buffer, query_pool,
+                                                         base_slot_to_reset, 2);
     }
   }
 
   uint32_t slot_index;
   bool found_slot = timer_query_pool_->NextReadyQuerySlot(device, &slot_index);
   CHECK(found_slot);
-  dispatch_table_->CmdWriteTimestamp(device)(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                             query_pool, slot_index);
+  dispatch_table_->CmdWriteTimestamp(command_buffer)(
+      command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool, slot_index);
   {
     absl::WriterMutexLock lock(&mutex_);
     CHECK(!command_buffer_to_state_.contains(command_buffer));
@@ -151,8 +110,8 @@ void CommandBufferManager::MarkCommandBufferEnd(const VkCommandBuffer& command_b
 
   uint32_t slot_base_index = command_buffer_state.command_buffer_marker.slot_index;
 
-  dispatch_table_->CmdWriteTimestamp(device)(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                             query_pool, slot_base_index + 1);
+  dispatch_table_->CmdWriteTimestamp(command_buffer)(
+      command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, query_pool, slot_base_index + 1);
 }
 
 void CommandBufferManager::DoSubmit(VkQueue queue, uint32_t submit_count,
@@ -289,7 +248,9 @@ void CommandBufferManager::ResetCommandPool(const VkCommandPool& command_pool) {
   absl::flat_hash_set<VkCommandBuffer> command_buffers;
   {
     absl::ReaderMutexLock lock(&mutex_);
-    CHECK(pool_to_command_buffers_.contains(command_pool));
+    if (!pool_to_command_buffers_.contains(command_pool)) {
+      return;
+    }
     command_buffers = pool_to_command_buffers_.at(command_pool);
   }
   for (const auto& command_buffer : command_buffers) {

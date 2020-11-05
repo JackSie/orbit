@@ -149,35 +149,6 @@ class TimerQueryPool {
     return pending_reset_slots;
   }
 
-  void PrintState(const VkDevice& device) {
-    absl::ReaderMutexLock lock(&mutex_);
-    uint32_t ready_for_query = 0;
-    uint32_t query_pending = 0;
-    uint32_t ready_for_reset = 0;
-    uint32_t reset_pending = 0;
-    for (const SlotState& slot_state : device_to_query_slots_.at(device)) {
-      if (slot_state == kReadyForQueryIssue) {
-        ready_for_query++;
-        continue;
-      }
-      if (slot_state == kQueryPendingOnGPU) {
-        query_pending++;
-        continue;
-      }
-      if (slot_state == kReadyForResetIssue) {
-        ready_for_reset++;
-        continue;
-      }
-      if (slot_state == kResetPendingOnGPU) {
-        reset_pending++;
-        continue;
-      }
-    }
-    LOG("QUERY POOL STATE:\nready for query: %du\nquery pending: %du\nready for reset: %du\nreset "
-        "pending: %du",
-        ready_for_query, query_pending, ready_for_reset, reset_pending);
-  }
-
  private:
   enum SlotState {
     kReadyForQueryIssue = 0,

@@ -92,21 +92,6 @@ VKAPI_ATTR void VKAPI_CALL OrbitDestroyDevice(VkDevice device,
 // Core layer logic
 // ----------------------------------------------------------------------------
 
-VKAPI_ATTR VkResult VKAPI_CALL OrbitCreateCommandPool(VkDevice device,
-                                                      const VkCommandPoolCreateInfo* create_info,
-                                                      const VkAllocationCallbacks* allocator,
-                                                      VkCommandPool* command_pool) {
-  VkResult result = logic_.CallCreateCommandPool(device, create_info, allocator, command_pool);
-  logic_.PostCallCreateCommandPool(device, create_info, allocator, command_pool);
-  return result;
-}
-
-VKAPI_ATTR void VKAPI_CALL OrbitDestroyCommandPool(VkDevice device, VkCommandPool command_pool,
-                                                   const VkAllocationCallbacks* allocator) {
-  logic_.CallDestroyCommandPool(device, command_pool, allocator);
-  logic_.PostCallDestroyCommandPool(device, command_pool, allocator);
-}
-
 VKAPI_ATTR VkResult VKAPI_CALL OrbitResetCommandPool(VkDevice device, VkCommandPool command_pool,
                                                      VkCommandPoolResetFlags flags) {
   VkResult result = logic_.CallResetCommandPool(device, command_pool, flags);
@@ -175,15 +160,6 @@ VKAPI_ATTR VkResult VKAPI_CALL OrbitQueuePresentKHR(VkQueue queue,
                                                     const VkPresentInfoKHR* present_info) {
   VkResult result = logic_.CallQueuePresentKHR(queue, present_info);
   logic_.PostCallQueuePresentKHR(queue, present_info);
-  return result;
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL OrbitEnumeratePhysicalDevices(VkInstance instance,
-                                                             uint32_t* physical_device_count,
-                                                             VkPhysicalDevice* physical_devices) {
-  VkResult result =
-      logic_.CallEnumeratePhysicalDevices(instance, physical_device_count, physical_devices);
-  logic_.PostCallEnumeratePhysicalDevices(instance, physical_device_count, physical_devices);
   return result;
 }
 
@@ -269,8 +245,6 @@ ORBIT_EXPORT VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL OrbitGetDeviceProcAddr(VkD
   ORBIT_GETPROCADDR(CreateDevice);
   ORBIT_GETPROCADDR(DestroyDevice);
 
-  ORBIT_GETPROCADDR(CreateCommandPool);
-  ORBIT_GETPROCADDR(DestroyCommandPool);
   ORBIT_GETPROCADDR(ResetCommandPool);
 
   ORBIT_GETPROCADDR(AllocateCommandBuffers);
@@ -298,7 +272,6 @@ ORBIT_EXPORT VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL OrbitGetInstanceProcAddr(V
   ORBIT_GETPROCADDR(DestroyInstance);
   ORBIT_GETPROCADDR(EnumerateInstanceLayerProperties);
   ORBIT_GETPROCADDR(EnumerateInstanceExtensionProperties);
-  ORBIT_GETPROCADDR(EnumeratePhysicalDevices);
 
   // Functions available through GetInstanceProcAddr and GetDeviceProcAddr
   ORBIT_GETPROCADDR(GetDeviceProcAddr);
@@ -307,8 +280,6 @@ ORBIT_EXPORT VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL OrbitGetInstanceProcAddr(V
   ORBIT_GETPROCADDR(CreateDevice);
   ORBIT_GETPROCADDR(DestroyDevice);
 
-  ORBIT_GETPROCADDR(CreateCommandPool);
-  ORBIT_GETPROCADDR(DestroyCommandPool);
   ORBIT_GETPROCADDR(ResetCommandPool);
 
   ORBIT_GETPROCADDR(AllocateCommandBuffers);

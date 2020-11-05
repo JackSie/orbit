@@ -40,8 +40,6 @@ class CommandBufferManager {
         physical_device_manager_(physical_device_manager),
         writer_(writer),
         connector_(connector) {}
-  void TrackCommandPool(VkCommandPool pool);
-  void UntrackCommandPool(VkCommandPool pool);
   void TrackCommandBuffers(VkDevice device, VkCommandPool pool,
                            const VkCommandBuffer* command_buffers, uint32_t count);
   void UntrackCommandBuffers(VkDevice device, VkCommandPool pool,
@@ -58,10 +56,6 @@ class CommandBufferManager {
   void ResetCommandBuffer(const VkCommandBuffer& command_buffer);
 
   void ResetCommandPool(const VkCommandPool& command_pool);
-
-  [[nodiscard]] bool IsCommandPoolTracked(const VkCommandPool& pool);
-  [[nodiscard]] bool IsCommandBufferTracked(const VkCommandBuffer& command_buffer);
-  [[nodiscard]] const VkDevice& GetDeviceOfCommandBuffer(const VkCommandBuffer& command_buffer);
 
  private:
   enum MarkerType { kCommandBuffer = 0, kDebugMarker };
@@ -91,8 +85,6 @@ class CommandBufferManager {
   };
 
   absl::Mutex mutex_;
-  absl::flat_hash_set<VkCommandPool> tracked_pools_;
-  absl::flat_hash_set<VkCommandBuffer> tracked_command_buffers_;
   absl::flat_hash_map<VkCommandPool, absl::flat_hash_set<VkCommandBuffer>> pool_to_command_buffers_;
   absl::flat_hash_map<VkCommandBuffer, VkDevice> command_buffer_to_device_;
 

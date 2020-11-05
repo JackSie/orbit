@@ -21,9 +21,8 @@ struct QueueFamilyInfo {
 
 class QueueFamilyInfoManager {
  public:
-  explicit QueueFamilyInfoManager(DispatchTable* dispatch_table,
-                                  PhysicalDeviceManager* physical_device_manager)
-      : dispatch_table_(dispatch_table), physical_device_manager_(physical_device_manager) {}
+  explicit QueueFamilyInfoManager(DispatchTable* dispatch_table)
+      : dispatch_table_(dispatch_table) {}
 
   void InitializeQueueFamilyInfo(const VkPhysicalDevice& device);
 
@@ -33,7 +32,6 @@ class QueueFamilyInfoManager {
 
  private:
   DispatchTable* dispatch_table_;
-  PhysicalDeviceManager* physical_device_manager_;
   absl::Mutex mutex_;
   absl::node_hash_map<VkPhysicalDevice, QueueFamilyInfo> device_to_queue_family_info_;
 };
