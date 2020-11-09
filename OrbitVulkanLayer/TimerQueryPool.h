@@ -10,6 +10,7 @@
 #include "QueueFamilyInfoManager.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
+#include "amdgpu.h"
 
 namespace orbit_vulkan_layer {
 
