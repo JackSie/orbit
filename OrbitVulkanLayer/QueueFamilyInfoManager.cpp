@@ -56,3 +56,13 @@ uint32_t orbit_vulkan_layer::QueueFamilyInfoManager::SuitableQueueFamilyIndexFor
   CHECK(!queue_family_info.reset_supporting_queue_family_indices.empty());
   return *queue_family_info.reset_supporting_queue_family_indices.begin();
 }
+
+uint32_t orbit_vulkan_layer::QueueFamilyInfoManager::SuitableQueueFamilyIndexForTimestamps(
+    const VkPhysicalDevice& device) {
+  LOG("SuitableQueueFamilyIndexForQueryPoolReset");
+  absl::ReaderMutexLock lock(&mutex_);
+  CHECK(device_to_queue_family_info_.contains(device));
+  const QueueFamilyInfo queue_family_info = device_to_queue_family_info_.at(device);
+  CHECK(!queue_family_info.timestamp_supporting_queue_family_indices.empty());
+  return *queue_family_info.timestamp_supporting_queue_family_indices.begin();
+}

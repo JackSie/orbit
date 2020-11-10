@@ -60,17 +60,6 @@ void CommandBufferManager::MarkCommandBufferBegin(const VkCommandBuffer& command
 
   VkQueryPool query_pool = timer_query_pool_->GetQueryPool(device);
 
-  // Let's try to reset the slots from the completed submits:
-  std::vector<uint32_t> base_slots_to_reset;
-  if (timer_query_pool_->IsResetNeeded()) {
-    base_slots_to_reset = timer_query_pool_->PullSlotsToReset(device);
-    CHECK(!base_slots_to_reset.empty());
-    for (uint32_t base_slot_to_reset : base_slots_to_reset) {
-      dispatch_table_->CmdResetQueryPool(command_buffer)(command_buffer, query_pool,
-                                                         base_slot_to_reset, 2);
-    }
-  }
-
   uint32_t slot_index;
   bool found_slot = timer_query_pool_->NextReadyQuerySlot(device, &slot_index);
   CHECK(found_slot);
@@ -81,9 +70,7 @@ void CommandBufferManager::MarkCommandBufferBegin(const VkCommandBuffer& command
     CHECK(!command_buffer_to_state_.contains(command_buffer));
     MarkerState marker_state{
         .type = kCommandBuffer, .text = "Command Buffer", .slot_index = slot_index};
-    command_buffer_to_state_[command_buffer] = {
-        .command_buffer_marker = std::move(marker_state),
-        .resetting_slot_indices = std::move(base_slots_to_reset)};
+    command_buffer_to_state_[command_buffer] = {.command_buffer_marker = std::move(marker_state)};
   }
 }
 
@@ -130,9 +117,8 @@ void CommandBufferManager::DoSubmit(VkQueue queue, uint32_t submit_count,
         continue;
       }
       CommandBufferState& state = command_buffer_to_state_.at(command_buffer);
-      SubmittedCommandBuffer submitted_command_buffer{
-          .command_buffer_marker = std::move(state.command_buffer_marker),
-          .resetting_slot_indices = std::move(state.resetting_slot_indices)};
+      SubmittedCommandBuffer submitted_command_buffer{.command_buffer_marker =
+                                                          std::move(state.command_buffer_marker)};
       submitted_submit_info.command_buffers.emplace_back(std::move(submitted_command_buffer));
       command_buffer_to_state_.erase(command_buffer);
     }
@@ -217,7 +203,6 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
   int64_t gpu_cpu_offset = physical_device_manager_->GetApproxCpuTimestampOffset(physical_device);
 
   std::vector<uint32_t> query_slots_to_reset;
-  std::vector<uint32_t> query_slots_reset_ready;
   for (const auto& completed_submission : completed_submissions) {
     orbit_grpc_protos::GpuQueueSubmisssion submission_proto;
     submission_proto.set_thread_id(completed_submission.thread_id);
@@ -229,9 +214,6 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
         orbit_grpc_protos::GpuCommandBuffer* command_buffer_proto =
             submit_info_proto->add_command_buffers();
 
-        query_slots_reset_ready.insert(query_slots_reset_ready.end(),
-                                       completed_command_buffer.resetting_slot_indices.begin(),
-                                       completed_command_buffer.resetting_slot_indices.end());
         const MarkerState& marker = completed_command_buffer.command_buffer_marker;
         VkDeviceSize result_stride = sizeof(uint64_t);
 
@@ -262,8 +244,7 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
     writer_->WriteQueueSubmission(submission_proto);
   }
 
-  timer_query_pool_->MarkSlotsReadyForReset(device, query_slots_to_reset);
-  timer_query_pool_->MarkSlotsReadyForQuery(device, query_slots_reset_ready);
+  timer_query_pool_->ResetSlots(device, query_slots_to_reset);
 }
 
 void CommandBufferManager::ResetCommandBuffer(const VkCommandBuffer& command_buffer) {
@@ -277,7 +258,6 @@ void CommandBufferManager::ResetCommandBuffer(const VkCommandBuffer& command_buf
   std::vector<uint32_t> marker_slots_to_rollback;
   marker_slots_to_rollback.push_back(state.command_buffer_marker.slot_index);
   timer_query_pool_->RollbackPendingQuerySlots(device, marker_slots_to_rollback);
-  timer_query_pool_->RollbackPendingResetSlots(device, state.resetting_slot_indices);
 
   command_buffer_to_state_.erase(command_buffer);
 }

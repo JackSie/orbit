@@ -27,6 +27,7 @@ class QueueFamilyInfoManager {
   void InitializeQueueFamilyInfo(const VkPhysicalDevice& device);
 
   uint32_t SuitableQueueFamilyIndexForQueryPoolReset(const VkPhysicalDevice& device);
+  uint32_t SuitableQueueFamilyIndexForTimestamps(const VkPhysicalDevice& device);
 
   void RemoveQueueFamilyInfo(const VkPhysicalDevice& device);
 

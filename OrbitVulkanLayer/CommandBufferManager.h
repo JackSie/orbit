@@ -83,12 +83,10 @@ class CommandBufferManager {
 
   struct CommandBufferState {
     MarkerState command_buffer_marker;
-    std::vector<uint32_t> resetting_slot_indices;
   };
 
   struct SubmittedCommandBuffer {
     MarkerState command_buffer_marker;
-    std::vector<uint32_t> resetting_slot_indices;
   };
 
   struct SubmitInfo {

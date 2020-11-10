@@ -96,6 +96,8 @@ class DispatchTable {
         next_get_device_proc_add_function(device, "vkCreateQueryPool"));
     dispatch_table.CmdResetQueryPool = absl::bit_cast<PFN_vkCmdResetQueryPool>(
         next_get_device_proc_add_function(device, "vkCmdResetQueryPool"));
+    dispatch_table.ResetQueryPoolEXT = absl::bit_cast<PFN_vkResetQueryPoolEXT>(
+        next_get_device_proc_add_function(device, "vkResetQueryPoolEXT"));
 
     dispatch_table.CmdWriteTimestamp = absl::bit_cast<PFN_vkCmdWriteTimestamp>(
         next_get_device_proc_add_function(device, "vkCmdWriteTimestamp"));
@@ -310,6 +312,14 @@ class DispatchTable {
     void* key = GetDispatchTableKey(dispatchable_object);
     CHECK(device_dispatch_table_.contains(key));
     return device_dispatch_table_.at(key).CmdResetQueryPool;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkResetQueryPoolEXT ResetQueryPoolEXT(const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).ResetQueryPoolEXT;
   }
 
   template <typename DispatchableType>
