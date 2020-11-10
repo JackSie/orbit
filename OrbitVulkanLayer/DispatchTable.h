@@ -132,6 +132,11 @@ class DispatchTable {
     dispatch_table.CmdPipelineBarrier = absl::bit_cast<PFN_vkCmdPipelineBarrier>(
         next_get_device_proc_add_function(device, "vkCmdPipelineBarrier"));
 
+    dispatch_table.CmdBeginDebugUtilsLabelEXT = absl::bit_cast<PFN_vkCmdBeginDebugUtilsLabelEXT>(
+        next_get_device_proc_add_function(device, "vkCmdBeginDebugUtilsLabelEXT"));
+    dispatch_table.CmdEndDebugUtilsLabelEXT = absl::bit_cast<PFN_vkCmdEndDebugUtilsLabelEXT>(
+        next_get_device_proc_add_function(device, "vkCmdEndDebugUtilsLabelEXT"));
+
     {
       absl::WriterMutexLock lock(&mutex_);
       device_dispatch_table_[GetDispatchTableKey(device)] = dispatch_table;
@@ -416,6 +421,24 @@ class DispatchTable {
     void* key = GetDispatchTableKey(dispatchable_object);
     CHECK(device_dispatch_table_.contains(key));
     return device_dispatch_table_.at(key).CmdPipelineBarrier;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkCmdBeginDebugUtilsLabelEXT CmdBeginDebugUtilsLabelEXT(
+      const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).CmdBeginDebugUtilsLabelEXT;
+  }
+
+  template <typename DispatchableType>
+  PFN_vkCmdEndDebugUtilsLabelEXT CmdEndDebugUtilsLabelEXT(
+      const DispatchableType& dispatchable_object) {
+    absl::ReaderMutexLock lock(&mutex_);
+    void* key = GetDispatchTableKey(dispatchable_object);
+    CHECK(device_dispatch_table_.contains(key));
+    return device_dispatch_table_.at(key).CmdEndDebugUtilsLabelEXT;
   }
 
  private:

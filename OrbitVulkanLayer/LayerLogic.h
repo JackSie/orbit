@@ -164,6 +164,20 @@ class LayerLogic {
   }
   void PostCallQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* present_info);
 
+  void CallCmdBeginDebugUtilsLabelEXT(VkCommandBuffer command_buffer,
+                                      const VkDebugUtilsLabelEXT* label_info) {
+    LOG("CallCmdBeginDebugUtilsLabelEXT");
+    dispatch_table_.CmdBeginDebugUtilsLabelEXT(command_buffer)(command_buffer, label_info);
+  }
+  void PostCallCmdBeginDebugUtilsLabelEXT(VkCommandBuffer command_buffer,
+                                          const VkDebugUtilsLabelEXT* label_info);
+
+  void PreCallCmdEndDebugUtilsLabelEXT(VkCommandBuffer command_buffer);
+  void CallCmdEndDebugUtilsLabelEXT(VkCommandBuffer command_buffer) {
+    LOG("CallCmdEndDebugUtilsLabelEXT");
+    dispatch_table_.CmdEndDebugUtilsLabelEXT(command_buffer)(command_buffer);
+  }
+
  private:
   DispatchTable dispatch_table_;
   PhysicalDeviceManager physical_device_manager_;

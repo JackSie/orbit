@@ -168,5 +168,12 @@ void LayerLogic::PostCallGetDeviceQueue2(VkDevice device, const VkDeviceQueueInf
   LOG("PostCallGetDeviceQueue2");
   queue_manager_.TrackQueue(*queue, device);
 }
+void LayerLogic::PostCallCmdBeginDebugUtilsLabelEXT(VkCommandBuffer /*command_buffer*/,
+                                                    const VkDebugUtilsLabelEXT* /*label_info*/) {
+  LOG("PostCallCmdBeginDebugUtilsLabelEXT");
+}
+void LayerLogic::PreCallCmdEndDebugUtilsLabelEXT(VkCommandBuffer /*command_buffer*/) {
+  LOG("PreCallCmdEndDebugUtilsLabelEXT");
+}
 
 }  // namespace orbit_vulkan_layer

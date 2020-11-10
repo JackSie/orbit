@@ -163,6 +163,17 @@ VKAPI_ATTR VkResult VKAPI_CALL OrbitQueuePresentKHR(VkQueue queue,
   return result;
 }
 
+VKAPI_ATTR void VKAPI_CALL OrbitCmdBeginDebugUtilsLabelEXT(VkCommandBuffer command_buffer,
+                                                           const VkDebugUtilsLabelEXT* label_info) {
+  logic_.CallCmdBeginDebugUtilsLabelEXT(command_buffer, label_info);
+  logic_.PostCallCmdBeginDebugUtilsLabelEXT(command_buffer, label_info);
+}
+
+VKAPI_ATTR void VKAPI_CALL OrbitCmdEndDebugUtilsLabelEXT(VkCommandBuffer command_buffer) {
+  logic_.PreCallCmdEndDebugUtilsLabelEXT(command_buffer);
+  logic_.CallCmdEndDebugUtilsLabelEXT(command_buffer);
+}
+
 // ----------------------------------------------------------------------------
 // Layer enumeration functions
 // ----------------------------------------------------------------------------
@@ -239,25 +250,28 @@ ORBIT_EXPORT VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL OrbitGetDeviceProcAddr(VkD
                                                                              const char* name) {
   LOG("OrbitGetDeviceProcAddr - %s", name);
   // Functions available through GetInstanceProcAddr and GetDeviceProcAddr
-  ORBIT_GETPROCADDR(GetDeviceProcAddr);
-  ORBIT_GETPROCADDR(EnumerateDeviceLayerProperties);
-  ORBIT_GETPROCADDR(EnumerateDeviceExtensionProperties);
-  ORBIT_GETPROCADDR(CreateDevice);
-  ORBIT_GETPROCADDR(DestroyDevice);
+  ORBIT_GETPROCADDR(GetDeviceProcAddr)
+  ORBIT_GETPROCADDR(EnumerateDeviceLayerProperties)
+  ORBIT_GETPROCADDR(EnumerateDeviceExtensionProperties)
+  ORBIT_GETPROCADDR(CreateDevice)
+  ORBIT_GETPROCADDR(DestroyDevice)
 
-  ORBIT_GETPROCADDR(ResetCommandPool);
+  ORBIT_GETPROCADDR(ResetCommandPool)
 
-  ORBIT_GETPROCADDR(AllocateCommandBuffers);
-  ORBIT_GETPROCADDR(FreeCommandBuffers);
+  ORBIT_GETPROCADDR(AllocateCommandBuffers)
+  ORBIT_GETPROCADDR(FreeCommandBuffers)
 
-  ORBIT_GETPROCADDR(BeginCommandBuffer);
-  ORBIT_GETPROCADDR(EndCommandBuffer);
-  ORBIT_GETPROCADDR(ResetCommandBuffer);
+  ORBIT_GETPROCADDR(BeginCommandBuffer)
+  ORBIT_GETPROCADDR(EndCommandBuffer)
+  ORBIT_GETPROCADDR(ResetCommandBuffer)
 
-  ORBIT_GETPROCADDR(QueueSubmit);
-  ORBIT_GETPROCADDR(QueuePresentKHR);
-  ORBIT_GETPROCADDR(GetDeviceQueue);
-  ORBIT_GETPROCADDR(GetDeviceQueue2);
+  ORBIT_GETPROCADDR(QueueSubmit)
+  ORBIT_GETPROCADDR(QueuePresentKHR)
+  ORBIT_GETPROCADDR(GetDeviceQueue)
+  ORBIT_GETPROCADDR(GetDeviceQueue2)
+
+  ORBIT_GETPROCADDR(CmdBeginDebugUtilsLabelEXT)
+  ORBIT_GETPROCADDR(CmdEndDebugUtilsLabelEXT)
 
   LOG("Fallback");
   return logic_.CallGetDeviceProcAddr(device, name);
@@ -267,32 +281,35 @@ ORBIT_EXPORT VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL OrbitGetInstanceProcAddr(V
                                                                                const char* name) {
   LOG("OrbitGetInstanceProcAddr - %s", name);
   // Functions available only through GetInstanceProcAddr
-  ORBIT_GETPROCADDR(GetInstanceProcAddr);
-  ORBIT_GETPROCADDR(CreateInstance);
-  ORBIT_GETPROCADDR(DestroyInstance);
-  ORBIT_GETPROCADDR(EnumerateInstanceLayerProperties);
-  ORBIT_GETPROCADDR(EnumerateInstanceExtensionProperties);
+  ORBIT_GETPROCADDR(GetInstanceProcAddr)
+  ORBIT_GETPROCADDR(CreateInstance)
+  ORBIT_GETPROCADDR(DestroyInstance)
+  ORBIT_GETPROCADDR(EnumerateInstanceLayerProperties)
+  ORBIT_GETPROCADDR(EnumerateInstanceExtensionProperties)
 
   // Functions available through GetInstanceProcAddr and GetDeviceProcAddr
-  ORBIT_GETPROCADDR(GetDeviceProcAddr);
-  ORBIT_GETPROCADDR(EnumerateDeviceLayerProperties);
-  ORBIT_GETPROCADDR(EnumerateDeviceExtensionProperties);
-  ORBIT_GETPROCADDR(CreateDevice);
-  ORBIT_GETPROCADDR(DestroyDevice);
+  ORBIT_GETPROCADDR(GetDeviceProcAddr)
+  ORBIT_GETPROCADDR(EnumerateDeviceLayerProperties)
+  ORBIT_GETPROCADDR(EnumerateDeviceExtensionProperties)
+  ORBIT_GETPROCADDR(CreateDevice)
+  ORBIT_GETPROCADDR(DestroyDevice)
 
-  ORBIT_GETPROCADDR(ResetCommandPool);
+  ORBIT_GETPROCADDR(ResetCommandPool)
 
-  ORBIT_GETPROCADDR(AllocateCommandBuffers);
-  ORBIT_GETPROCADDR(FreeCommandBuffers);
+  ORBIT_GETPROCADDR(AllocateCommandBuffers)
+  ORBIT_GETPROCADDR(FreeCommandBuffers)
 
-  ORBIT_GETPROCADDR(BeginCommandBuffer);
-  ORBIT_GETPROCADDR(EndCommandBuffer);
-  ORBIT_GETPROCADDR(ResetCommandBuffer);
+  ORBIT_GETPROCADDR(BeginCommandBuffer)
+  ORBIT_GETPROCADDR(EndCommandBuffer)
+  ORBIT_GETPROCADDR(ResetCommandBuffer)
 
-  ORBIT_GETPROCADDR(QueueSubmit);
-  ORBIT_GETPROCADDR(QueuePresentKHR);
-  ORBIT_GETPROCADDR(GetDeviceQueue);
-  ORBIT_GETPROCADDR(GetDeviceQueue2);
+  ORBIT_GETPROCADDR(QueueSubmit)
+  ORBIT_GETPROCADDR(QueuePresentKHR)
+  ORBIT_GETPROCADDR(GetDeviceQueue)
+  ORBIT_GETPROCADDR(GetDeviceQueue2)
+
+  ORBIT_GETPROCADDR(CmdBeginDebugUtilsLabelEXT)
+  ORBIT_GETPROCADDR(CmdEndDebugUtilsLabelEXT)
 
   LOG("Fallback");
   return logic_.CallGetInstanceProcAddr(instance, name);

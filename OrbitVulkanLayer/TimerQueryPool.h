@@ -62,7 +62,6 @@ class TimerQueryPool {
   absl::flat_hash_map<VkDevice, uint32_t> device_to_potential_next_free_index_;
 
   absl::flat_hash_map<VkDevice, std::vector<uint32_t>> device_to_pending_reset_slots_;
-  std::atomic<bool> reset_needed_ = false;
 };
 }  // namespace orbit_vulkan_layer
 
