@@ -34,47 +34,10 @@ class TimerQueryPool {
   [[nodiscard]] VkQueryPool GetQueryPool(const VkDevice& device);
   [[nodiscard]] bool NextReadyQuerySlot(const VkDevice& device, uint32_t* allocated_index);
 
-  void ResetSlots(const VkDevice& device, const std::vector<uint32_t>& physical_slot_indices) {
-    if (physical_slot_indices.empty()) {
-      return;
-    }
-    LOG("ResetSlots");
-    absl::WriterMutexLock lock(&mutex_);
-    std::array<SlotState, kNumLogicalQuerySlots>& slot_states = device_to_query_slots_.at(device);
-    for (uint32_t physical_slot_index : physical_slot_indices) {
-      CHECK(physical_slot_index < kNumPhysicalTimerQuerySlots);
-      bool is_base_slot = (physical_slot_index % 2) == 0;
-      CHECK(is_base_slot);
-      uint32_t logical_slot_index = physical_slot_index / 2;
-      const SlotState& current_state = slot_states.at(logical_slot_index);
-      CHECK(current_state == kQueryPendingOnGPU);
-      const VkQueryPool& query_pool = device_to_query_pool_.at(device);
-      dispatch_table_->ResetQueryPoolEXT(device)(device, query_pool, physical_slot_index, 2);
-      slot_states.at(logical_slot_index) = kReadyForQueryIssue;
-    }
-  }
+  void ResetQuerySlots(const VkDevice& device, const std::vector<uint32_t>& physical_slot_indices);
 
   void RollbackPendingQuerySlots(const VkDevice& device,
-                                 const std::vector<uint32_t>& physical_slot_indices) {
-    if (physical_slot_indices.empty()) {
-      return;
-    }
-    LOG("RollbackPendingQuerySlots");
-    absl::WriterMutexLock lock(&mutex_);
-    std::array<SlotState, kNumLogicalQuerySlots>& slot_states = device_to_query_slots_.at(device);
-    for (uint32_t physical_slot_index : physical_slot_indices) {
-      CHECK(physical_slot_index < kNumPhysicalTimerQuerySlots);
-      bool is_base_slot = (physical_slot_index % 2) == 0;
-      CHECK(is_base_slot);
-      uint32_t logical_slot_index = physical_slot_index / 2;
-      const SlotState& current_state = slot_states.at(logical_slot_index);
-      if (current_state != kQueryPendingOnGPU) {
-        LOG("state: %u, index: %u", current_state, logical_slot_index);
-      }
-      CHECK(current_state == kQueryPendingOnGPU);
-      slot_states.at(logical_slot_index) = kReadyForQueryIssue;
-    }
-  }
+                                 const std::vector<uint32_t>& physical_slot_indices);
 
  private:
   enum SlotState {
@@ -85,8 +48,8 @@ class TimerQueryPool {
   static constexpr uint32_t kNumLogicalQuerySlots = 16384;
   static constexpr uint32_t kNumPhysicalTimerQuerySlots = kNumLogicalQuerySlots * 2;
 
-  void ResetTimerQueryPool(const VkDevice& device, const VkPhysicalDevice& physical_device,
-                           const VkQueryPool& query_pool);
+  void CalibrateGPUTimeStamps(const VkDevice& device, const VkPhysicalDevice& physical_device,
+                              const VkQueryPool& query_pool);
 
   DispatchTable* dispatch_table_;
   QueueFamilyInfoManager* queue_family_info_manager_;

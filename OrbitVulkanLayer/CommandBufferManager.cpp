@@ -244,7 +244,7 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
     writer_->WriteQueueSubmission(submission_proto);
   }
 
-  timer_query_pool_->ResetSlots(device, query_slots_to_reset);
+  timer_query_pool_->ResetQuerySlots(device, query_slots_to_reset);
 }
 
 void CommandBufferManager::ResetCommandBuffer(const VkCommandBuffer& command_buffer) {

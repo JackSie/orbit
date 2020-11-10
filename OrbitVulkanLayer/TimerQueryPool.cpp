@@ -25,7 +25,9 @@ void orbit_vulkan_layer::TimerQueryPool::InitializeTimerQueryPool(
       dispatch_table_->CreateQueryPool(device)(device, &create_info, nullptr, &query_pool);
   CHECK(result == VK_SUCCESS);
 
-  ResetTimerQueryPool(device, physical_device, query_pool);
+  dispatch_table_->ResetQueryPoolEXT(device)(device, query_pool, 0, kNumPhysicalTimerQuerySlots);
+
+  CalibrateGPUTimeStamps(device, physical_device, query_pool);
 
   {
     absl::WriterMutexLock lock(&mutex_);
@@ -46,11 +48,10 @@ VkQueryPool TimerQueryPool::GetQueryPool(const VkDevice& device) {
 }
 
 // TODO: Rename
-void TimerQueryPool::ResetTimerQueryPool(const VkDevice& device,
-                                         const VkPhysicalDevice& physical_device,
-                                         const VkQueryPool& query_pool) {
-  LOG("ResetTimerQueryPool");
-  dispatch_table_->ResetQueryPoolEXT(device)(device, query_pool, 0, kNumPhysicalTimerQuerySlots);
+void TimerQueryPool::CalibrateGPUTimeStamps(const VkDevice& device,
+                                            const VkPhysicalDevice& physical_device,
+                                            const VkQueryPool& query_pool) {
+  LOG("CalibrateGPUTimeStamps");
 
   uint32_t timestamp_queue_family_index =
       queue_family_info_manager_->SuitableQueueFamilyIndexForQueryPoolReset(physical_device);
@@ -263,6 +264,49 @@ bool TimerQueryPool::NextReadyQuerySlot(const VkDevice& device, uint32_t* alloca
   } while (current_slot != potential_next_free_slot);
 
   return false;
+}
+
+void TimerQueryPool::ResetQuerySlots(const VkDevice& device,
+                                     const std::vector<uint32_t>& physical_slot_indices) {
+  if (physical_slot_indices.empty()) {
+    return;
+  }
+  LOG("ResetQuerySlots");
+  absl::WriterMutexLock lock(&mutex_);
+  std::array<SlotState, kNumLogicalQuerySlots>& slot_states = device_to_query_slots_.at(device);
+  for (uint32_t physical_slot_index : physical_slot_indices) {
+    CHECK(physical_slot_index < kNumPhysicalTimerQuerySlots);
+    bool is_base_slot = (physical_slot_index % 2) == 0;
+    CHECK(is_base_slot);
+    uint32_t logical_slot_index = physical_slot_index / 2;
+    const SlotState& current_state = slot_states.at(logical_slot_index);
+    CHECK(current_state == kQueryPendingOnGPU);
+    const VkQueryPool& query_pool = device_to_query_pool_.at(device);
+    dispatch_table_->ResetQueryPoolEXT(device)(device, query_pool, physical_slot_index, 2);
+    slot_states.at(logical_slot_index) = kReadyForQueryIssue;
+  }
+}
+
+void TimerQueryPool::RollbackPendingQuerySlots(const VkDevice& device,
+                                               const std::vector<uint32_t>& physical_slot_indices) {
+  if (physical_slot_indices.empty()) {
+    return;
+  }
+  LOG("RollbackPendingQuerySlots");
+  absl::WriterMutexLock lock(&mutex_);
+  std::array<SlotState, kNumLogicalQuerySlots>& slot_states = device_to_query_slots_.at(device);
+  for (uint32_t physical_slot_index : physical_slot_indices) {
+    CHECK(physical_slot_index < kNumPhysicalTimerQuerySlots);
+    bool is_base_slot = (physical_slot_index % 2) == 0;
+    CHECK(is_base_slot);
+    uint32_t logical_slot_index = physical_slot_index / 2;
+    const SlotState& current_state = slot_states.at(logical_slot_index);
+    if (current_state != kQueryPendingOnGPU) {
+      LOG("state: %u, index: %u", current_state, logical_slot_index);
+    }
+    CHECK(current_state == kQueryPendingOnGPU);
+    slot_states.at(logical_slot_index) = kReadyForQueryIssue;
+  }
 }
 
 }  // namespace orbit_vulkan_layer
