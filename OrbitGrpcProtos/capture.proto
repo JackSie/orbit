@@ -104,7 +104,7 @@ message InternedTracepointInfo {
 message TracepointEvent {
   int32 pid = 1;
   int32 tid = 2;
-  int64 time = 3;
+  uint64 time = 3;
   int32 cpu = 4;
   oneof tracepoint_info_or_key {
     TracepointInfo tracepoint_info = 5;
@@ -183,6 +183,7 @@ message GpuQueueSubmisssion {
   uint64 post_submission_cpu_timestamp = 3;
   uint64 gpu_cpu_time_offset = 4;
   repeated GpuSubmitInfo submit_infos = 5;
+  repeated GpuDebugMarker completed_markers = 6;
 }
 
 message GpuSubmitInfo {
@@ -192,6 +193,23 @@ message GpuSubmitInfo {
 message GpuCommandBuffer {
   uint64 begin_gpu_timestamp_ns = 1;
   uint64 end_gpu_timestamp_ns = 2;
+}
+
+message GpuDebugMarkerBeginInfo {
+  uint64 begin_gpu_timestamp_ns = 1;
+  int32 begin_thread_id = 2;
+  uint64 begin_pre_submission_cpu_timestamp = 3;
+  uint64 begin_post_submission_cpu_timestamp = 4;
+}
+
+message GpuDebugMarker {
+  oneof begin_marker_option {
+    GpuDebugMarkerBeginInfo begin_marker = 1;
+  };
+  uint64 end_gpu_timestamp_ns = 2;
+  // TODO: we should not send text all the time
+  string text = 3;
+  uint64 depth = 4;
 }
 
 message CaptureEvent {

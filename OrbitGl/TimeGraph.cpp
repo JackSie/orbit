@@ -329,6 +329,12 @@ void TimeGraph::ProcessTimer(const TimerInfo& timer_info, const FunctionInfo* fu
       track->OnTimer(timer_info);
       break;
     }
+    case TimerInfo::kGpuDebugMarker: {
+      uint64_t timeline_hash = timer_info.timeline_hash();
+      std::shared_ptr<GpuTrack> track = GetOrCreateGpuTrack(timeline_hash);
+      track->OnTimer(timer_info);
+      break;
+    }
     case TimerInfo::kNone: {
       std::shared_ptr<ThreadTrack> track = GetOrCreateThreadTrack(timer_info.thread_id());
       track->OnTimer(timer_info);

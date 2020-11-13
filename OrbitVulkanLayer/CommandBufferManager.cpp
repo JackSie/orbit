@@ -100,6 +100,8 @@ void CommandBufferManager::MarkCommandBufferEnd(const VkCommandBuffer& command_b
 
   dispatch_table_->CmdWriteTimestamp(command_buffer)(
       command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, query_pool, slot_index);
+  // Eventhough, we are just under a reader mutex, writing to this field is safe, as
+  // there can't be any operation on this command buffer in parallel.
   command_buffer_state.command_buffer_end_slot_index = std::make_optional(slot_index);
 }
 
@@ -131,6 +133,7 @@ void CommandBufferManager::MarkDebugMarkerBegin(const VkCommandBuffer& command_b
 
   state.markers.back().slot_index = std::make_optional(slot_index);
 }
+
 void CommandBufferManager::MarkDebugMarkerEnd(const VkCommandBuffer& command_buffer) {
   absl::WriterMutexLock lock(&mutex_);
   CHECK(command_buffer_to_state_.contains(command_buffer));
@@ -226,7 +229,9 @@ void CommandBufferManager::DoPostSubmitQueue(const VkQueue& queue, uint32_t subm
                 submitted_marker = {.meta_information = queue_submission->meta_information,
                                     .slot_index = marker.slot_index.value()};
               }
-              MarkerState marker_state{.text = marker.text, .begin_info = submitted_marker};
+              MarkerState marker_state{.text = marker.text,
+                                       .begin_info = submitted_marker,
+                                       .depth = markers.marker_stack.size()};
               markers.marker_stack.push(std::move(marker_state));
               break;
             }
@@ -237,11 +242,10 @@ void CommandBufferManager::DoPostSubmitQueue(const VkQueue& queue, uint32_t subm
               if (queue_submission != nullptr && marker.slot_index.has_value()) {
                 submitted_marker = {.meta_information = queue_submission->meta_information,
                                     .slot_index = marker.slot_index.value()};
+                marker_state.end_info = submitted_marker;
+                queue_submission->completed_markers.emplace_back(std::move(marker_state));
               }
-              marker_state.end_info = submitted_marker;
-              if (marker.slot_index.has_value()) {
-                markers.markers[marker.slot_index.value()] = std::move(marker_state);
-              }
+
               break;
             }
           }
@@ -258,7 +262,7 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
   std::vector<QueueSubmission> completed_submissions;
   {
     absl::WriterMutexLock lock(&mutex_);
-    for (auto& [unused_queue, queue_submissions] : queue_to_submissions_) {
+    for (auto& [queue, queue_submissions] : queue_to_submissions_) {
       auto submission_it = queue_submissions.begin();
       while (submission_it != queue_submissions.end()) {
         const QueueSubmission& submission = *submission_it;
@@ -359,6 +363,47 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
         query_slots_to_reset.push_back(completed_command_buffer.command_buffer_end_slot_index);
       }
     }
+
+    for (const auto& marker_state : completed_submission.completed_markers) {
+      VkDeviceSize result_stride = sizeof(uint64_t);
+
+      uint64_t end_timestamp = 0;
+      VkResult result_status = dispatch_table_->GetQueryPoolResults(device)(
+          device, query_pool, marker_state.end_info.value().slot_index, 1, sizeof(end_timestamp),
+          &end_timestamp, result_stride, VK_QUERY_RESULT_64_BIT);
+      CHECK(result_status == VK_SUCCESS);
+      query_slots_to_reset.push_back(marker_state.end_info->slot_index);
+      end_timestamp = static_cast<uint64_t>(static_cast<double>(end_timestamp) * timestamp_period);
+
+      orbit_grpc_protos::GpuDebugMarker* marker_proto = submission_proto.add_completed_markers();
+      marker_proto->set_text(marker_state.text);
+      marker_proto->set_depth(marker_state.depth);
+      marker_proto->set_end_gpu_timestamp_ns(end_timestamp);
+
+      if (!marker_state.begin_info.has_value()) {
+        continue;
+      }
+      const auto& begin_meta_info = marker_state.begin_info.value().meta_information;
+      orbit_grpc_protos::GpuDebugMarkerBeginInfo* begin_debug_marker_proto =
+          marker_proto->mutable_begin_marker();
+      begin_debug_marker_proto->set_begin_thread_id(begin_meta_info.thread_id);
+      begin_debug_marker_proto->set_begin_pre_submission_cpu_timestamp(
+          begin_meta_info.pre_submission_cpu_timestamp);
+      begin_debug_marker_proto->set_begin_post_submission_cpu_timestamp(
+          begin_meta_info.post_submission_cpu_timestamp);
+
+      uint64_t begin_timestamp = 0;
+      result_status = dispatch_table_->GetQueryPoolResults(device)(
+          device, query_pool, marker_state.begin_info.value().slot_index, 1,
+          sizeof(begin_timestamp), &begin_timestamp, result_stride, VK_QUERY_RESULT_64_BIT);
+      CHECK(result_status == VK_SUCCESS);
+      begin_timestamp =
+          static_cast<uint64_t>(static_cast<double>(begin_timestamp) * timestamp_period);
+      query_slots_to_reset.push_back(marker_state.begin_info->slot_index);
+
+      begin_debug_marker_proto->set_begin_gpu_timestamp_ns(begin_timestamp);
+    }
+
     writer_->WriteQueueSubmission(submission_proto);
   }
 

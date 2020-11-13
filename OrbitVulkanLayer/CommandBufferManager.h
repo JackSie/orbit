@@ -85,15 +85,11 @@ class CommandBufferManager {
     std::optional<SubmittedMarker> begin_info;
     std::optional<SubmittedMarker> end_info;
     std::string text;
-  };
-
-  struct CommandBufferMarkers {
-    std::vector<Marker> markers;
+    size_t depth;
   };
 
   struct QueueMarkerState {
     std::stack<MarkerState> marker_stack;
-    absl::flat_hash_map<uint32_t, MarkerState> markers;
   };
 
   struct CommandBufferState {
@@ -114,6 +110,7 @@ class CommandBufferManager {
   struct QueueSubmission {
     SubmissionMetaInformation meta_information;
     std::vector<SubmitInfo> submit_infos;
+    std::vector<MarkerState> completed_markers;
   };
 
   absl::Mutex mutex_;
