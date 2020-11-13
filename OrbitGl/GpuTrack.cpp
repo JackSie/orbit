@@ -24,19 +24,19 @@ namespace OrbitGl {
 std::string MapGpuTimelineToTrackLabel(std::string_view timeline) {
   std::string label;
   if (timeline.rfind("gfx", 0) == 0) {
-    if (timeline.rfind("_marker", 0) == 0) {
+    if (timeline.find("_marker") != std::string::npos) {
       return absl::StrFormat("Graphics queue Debug Markers(%s)", timeline);
     }
     return absl::StrFormat("Graphics queue (%s)", timeline);
   }
   if (timeline.rfind("sdma", 0) == 0) {
-    if (timeline.rfind("_marker", 0) == 0) {
+    if (timeline.find("_marker") != std::string::npos) {
       return absl::StrFormat("Transfer queue Debug Markers(%s)", timeline);
     }
     return absl::StrFormat("Transfer queue (%s)", timeline);
   }
   if (timeline.rfind("comp", 0) == 0) {
-    if (timeline.rfind("_marker", 0) == 0) {
+    if (timeline.find("_marker") != std::string::npos) {
       return absl::StrFormat("Compute queue Debug Markers(%s)", timeline);
     }
     return absl::StrFormat("Compute queue (%s)", timeline);
