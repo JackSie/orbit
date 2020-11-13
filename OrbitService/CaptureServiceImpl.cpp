@@ -4,8 +4,6 @@
 
 #include "CaptureServiceImpl.h"
 
-#include "OrbitBase/MakeUniqueForOverwrite.h"
-
 #include <cstdio>
 #include <iostream>
 
@@ -13,6 +11,7 @@
 #include "CaptureEventSender.h"
 #include "LinuxTracingHandler.h"
 #include "OrbitBase/Logging.h"
+#include "OrbitBase/MakeUniqueForOverwrite.h"
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 #include "google/protobuf/message.h"
@@ -56,22 +55,21 @@ class SenderThreadCaptureEventBuffer final : public CaptureEventBuffer {
   ~SenderThreadCaptureEventBuffer() override { CHECK(!sender_thread_.joinable()); }
 
  private:
-
   bool ReadMessage(google::protobuf::Message* message,
-                 google::protobuf::io::CodedInputStream* input) {
-  uint32_t message_size;
-  if (!input->ReadLittleEndian32(&message_size)) {
-    return false;
-  }
+                   google::protobuf::io::CodedInputStream* input) {
+    uint32_t message_size;
+    if (!input->ReadLittleEndian32(&message_size)) {
+      return false;
+    }
 
-  std::unique_ptr<char[]> buffer = make_unique_for_overwrite<char[]>(message_size);
-  if (!input->ReadRaw(buffer.get(), message_size)) {
-    return false;
-  }
-  message->ParseFromArray(buffer.get(), message_size);
+    std::unique_ptr<char[]> buffer = make_unique_for_overwrite<char[]>(message_size);
+    if (!input->ReadRaw(buffer.get(), message_size)) {
+      return false;
+    }
+    message->ParseFromArray(buffer.get(), message_size);
 
-  return true;
-}
+    return true;
+  }
 
   void SenderThread() {
     pthread_setname_np(pthread_self(), "SenderThread");
@@ -94,23 +92,28 @@ class SenderThreadCaptureEventBuffer final : public CaptureEventBuffer {
       if (stop_requested_) {
         stopped = true;
 
-      // now read the vulkan layer result:
-      const std::string file_name = "/mnt/developer/orbit_test_file";
-      std::ifstream file(file_name, std::ios::binary);
-      if (file.good()) {
-        google::protobuf::io::IstreamInputStream input_stream(&file);
-        google::protobuf::io::CodedInputStream coded_input(&input_stream);
+        // now read the vulkan layer result:
+        const std::string file_name = "/mnt/developer/orbit_test_file";
+        std::ifstream file(file_name, std::ios::binary);
+        if (file.good()) {
+          google::protobuf::io::IstreamInputStream input_stream(&file);
+          google::protobuf::io::CodedInputStream coded_input(&input_stream);
 
-        orbit_grpc_protos::GpuQueueSubmisssion queue_submission;
-        while (ReadMessage(&queue_submission, &coded_input)) {
-          CaptureEvent event;
-          event.mutable_gpu_queue_submission()->CopyFrom(queue_submission);
-          event_buffer_.emplace_back(std::move(event));
+          orbit_grpc_protos::GpuQueueSubmisssion queue_submission;
+          while (ReadMessage(&queue_submission, &coded_input)) {
+            CaptureEvent event;
+            event.mutable_gpu_queue_submission()->CopyFrom(queue_submission);
+            event_buffer_.emplace_back(std::move(event));
+          }
+
+          file.close();
+          std::remove(file_name.c_str());
         }
-
-        file.close();
-        std::remove(file_name.c_str());
       }
+      std::vector<CaptureEvent> buffered_events = std::move(event_buffer_);
+      event_buffer_.clear();
+      event_buffer_mutex_.Unlock();
+      capture_event_sender_->SendEvents(std::move(buffered_events));
     }
   }
 
