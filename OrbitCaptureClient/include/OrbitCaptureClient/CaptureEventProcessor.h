@@ -48,9 +48,12 @@ class CaptureEventProcessor {
                                                       uint64_t post_submission_cpu_timestamp);
   const orbit_grpc_protos::GpuQueueSubmisssion* FindMatchingGpuQueueSubmission(
       const orbit_grpc_protos::GpuJob& gpu_job);
+  [[nodiscard]] bool HasUnprocessedBeginMarkers(int32_t thread_id,
+                                                uint64_t post_submission_timestamp) const;
+  void DecrementUnprocessedBeginMarkers(int32_t thread_id, uint64_t post_submission_timestamp);
 
   absl::flat_hash_map<uint64_t, orbit_grpc_protos::Callstack> callstack_intern_pool;
-  absl::flat_hash_map<uint64_t, std::string> string_intern_pool;
+  absl::flat_hash_map<uint64_t, std::string> string_intern_pool_;
   absl::flat_hash_map<uint64_t, orbit_grpc_protos::TracepointInfo> tracepoint_intern_pool_;
   CaptureListener* capture_listener_ = nullptr;
 
@@ -67,6 +70,8 @@ class CaptureEventProcessor {
       tid_to_submission_time_to_gpu_job_;
   absl::flat_hash_map<int32_t, std::map<uint64_t, orbit_grpc_protos::GpuQueueSubmisssion>>
       tid_to_post_submission_time_to_gpu_submission_;
+  absl::flat_hash_map<int32_t, absl::flat_hash_map<uint64_t, uint32_t>>
+      tid_to_post_submission_time_to_num_begin_markers_;
   uint64_t begin_capture_time_ns_ = std::numeric_limits<uint64_t>::max();
 };
 

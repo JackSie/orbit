@@ -11,6 +11,7 @@
 #include <utility>
 
 #include "OrbitBase/Logging.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/synchronization/mutex.h"
 #include "capture.grpc.pb.h"
 #include "google/protobuf/io/coded_stream.h"
@@ -24,7 +25,31 @@ class Writer {
 
   void WriteQueueSubmission(const orbit_grpc_protos::GpuQueueSubmisssion& submisssion) {
     LOG("WriteQueueSubmission");
-    WriteMessage(submisssion);
+    orbit_grpc_protos::CaptureEvent event;
+    event.mutable_gpu_queue_submission()->CopyFrom(submisssion);
+    WriteMessage(event);
+  }
+
+  uint64_t InternStringIfNecessaryAndGetKey(std::string str) {
+    uint64_t key = ComputeStringKey(str);
+    {
+      absl::MutexLock lock{&string_keys_sent_mutex_};
+      if (string_keys_sent_.contains(key)) {
+        return key;
+      }
+      string_keys_sent_.emplace(key);
+    }
+
+    orbit_grpc_protos::CaptureEvent event;
+    event.mutable_interned_string()->set_key(key);
+    event.mutable_interned_string()->set_intern(std::move(str));
+    WriteMessage(event);
+    return key;
+  }
+
+  void ClearStringInternPool() {
+    absl::MutexLock lock{&string_keys_sent_mutex_};
+    string_keys_sent_.clear();
   }
 
  private:
@@ -38,7 +63,11 @@ class Writer {
     message.SerializeToCodedStream(&coded_output);
   }
 
+  static uint64_t ComputeStringKey(const std::string& str) { return std::hash<std::string>{}(str); }
+
   std::string filename_;
+  absl::flat_hash_set<uint64_t> string_keys_sent_;
+  absl::Mutex string_keys_sent_mutex_;
 };
 
 }  // namespace orbit_vulkan_layer

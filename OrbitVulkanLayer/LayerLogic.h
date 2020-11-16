@@ -39,6 +39,7 @@ class LayerLogic {
         queue_family_info_manager_(&dispatch_table_),
         timer_query_pool_(&dispatch_table_, &queue_family_info_manager_, &physical_device_manager_),
         writer_("/mnt/developer/orbit_test_file"),
+        connector_(&writer_),
         command_buffer_manager_(&dispatch_table_, &timer_query_pool_, &physical_device_manager_,
                                 &writer_, &connector_) {
     LOG("LayerLogic");
@@ -209,9 +210,9 @@ class LayerLogic {
   QueueFamilyInfoManager queue_family_info_manager_;
   TimerQueryPool timer_query_pool_;
   Writer writer_;
+  OrbitConnector connector_;
   CommandBufferManager command_buffer_manager_;
   QueueManager queue_manager_;
-  OrbitConnector connector_;
 };
 
 }  // namespace orbit_vulkan_layer

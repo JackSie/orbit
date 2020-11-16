@@ -184,6 +184,7 @@ message GpuQueueSubmisssion {
   uint64 gpu_cpu_time_offset = 4;
   repeated GpuSubmitInfo submit_infos = 5;
   repeated GpuDebugMarker completed_markers = 6;
+  uint32 num_begin_markers = 7;
 }
 
 message GpuSubmitInfo {
@@ -207,8 +208,7 @@ message GpuDebugMarker {
     GpuDebugMarkerBeginInfo begin_marker = 1;
   };
   uint64 end_gpu_timestamp_ns = 2;
-  // TODO: we should not send text all the time
-  string text = 3;
+  uint64 text_key = 3;
   uint64 depth = 4;
 }
 

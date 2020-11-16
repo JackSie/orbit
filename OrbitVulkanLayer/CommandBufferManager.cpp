@@ -228,6 +228,7 @@ void CommandBufferManager::DoPostSubmitQueue(const VkQueue& queue, uint32_t subm
               if (queue_submission != nullptr && marker.slot_index.has_value()) {
                 submitted_marker = {.meta_information = queue_submission->meta_information,
                                     .slot_index = marker.slot_index.value()};
+                ++queue_submission->num_begin_markers;
               }
               MarkerState marker_state{.text = marker.text,
                                        .begin_info = submitted_marker,
@@ -325,6 +326,7 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
 
   std::vector<uint32_t> query_slots_to_reset;
   for (const auto& completed_submission : completed_submissions) {
+    orbit_grpc_protos::CaptureEvent proto;
     orbit_grpc_protos::GpuQueueSubmisssion submission_proto;
     const SubmissionMetaInformation meta_info = completed_submission.meta_information;
     submission_proto.set_thread_id(meta_info.thread_id);
@@ -364,6 +366,7 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
       }
     }
 
+    submission_proto.set_num_begin_markers(completed_submission.num_begin_markers);
     for (const auto& marker_state : completed_submission.completed_markers) {
       VkDeviceSize result_stride = sizeof(uint64_t);
 
@@ -376,7 +379,7 @@ void CommandBufferManager::CompleteSubmits(const VkDevice& device) {
       end_timestamp = static_cast<uint64_t>(static_cast<double>(end_timestamp) * timestamp_period);
 
       orbit_grpc_protos::GpuDebugMarker* marker_proto = submission_proto.add_completed_markers();
-      marker_proto->set_text(marker_state.text);
+      marker_proto->set_text_key(writer_->InternStringIfNecessaryAndGetKey(marker_state.text));
       marker_proto->set_depth(marker_state.depth);
       marker_proto->set_end_gpu_timestamp_ns(end_timestamp);
 

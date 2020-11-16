@@ -166,16 +166,16 @@ void CaptureEventProcessor::ProcessIntrospectionScope(
 }
 
 void CaptureEventProcessor::ProcessInternedString(InternedString interned_string) {
-  if (string_intern_pool.contains(interned_string.key())) {
+  if (string_intern_pool_.contains(interned_string.key())) {
     ERROR("Overwriting InternedString with key %llu", interned_string.key());
   }
-  string_intern_pool.emplace(interned_string.key(), std::move(*interned_string.mutable_intern()));
+  string_intern_pool_.emplace(interned_string.key(), std::move(*interned_string.mutable_intern()));
 }
 
 void CaptureEventProcessor::ProcessGpuJob(const GpuJob& gpu_job) {
   std::string timeline;
   if (gpu_job.timeline_or_key_case() == GpuJob::kTimelineKey) {
-    timeline = string_intern_pool[gpu_job.timeline_key()];
+    timeline = string_intern_pool_[gpu_job.timeline_key()];
   } else {
     timeline = gpu_job.timeline();
   }
@@ -228,18 +228,21 @@ void CaptureEventProcessor::ProcessGpuJob(const GpuJob& gpu_job) {
   timer_start_to_finish.set_type(TimerInfo::kGpuActivity);
   capture_listener_->OnTimer(std::move(timer_start_to_finish));
 
-  /*TODO: ONLY ERASE IF ALL MARKERS HAVE BEEN PROCESSED or matching_gpu_submission == null*/
-  tid_to_submission_time_to_gpu_job_[gpu_job.tid()][gpu_job.amdgpu_cs_ioctl_time_ns()] = gpu_job;
   const GpuQueueSubmisssion* matching_gpu_submission = FindMatchingGpuQueueSubmission(gpu_job);
+  if (matching_gpu_submission == nullptr || matching_gpu_submission->num_begin_markers() > 0) {
+    tid_to_submission_time_to_gpu_job_[gpu_job.tid()][gpu_job.amdgpu_cs_ioctl_time_ns()] = gpu_job;
+  }
   if (matching_gpu_submission == nullptr) {
     return;
   }
 
   DoProcessGpuQueueSubmission(*matching_gpu_submission, gpu_job);
-  /*TODO: ONLY ERASE IF ALL MARKERS HAVE BEEN PROCESSED
-  tid_to_post_submission_time_to_gpu_submission_.at(gpu_job.tid())
-      .erase(matching_gpu_submission->post_submission_cpu_timestamp());
-      */
+
+  if (!HasUnprocessedBeginMarkers(matching_gpu_submission->thread_id(),
+                                  matching_gpu_submission->post_submission_cpu_timestamp())) {
+    tid_to_post_submission_time_to_gpu_submission_.at(gpu_job.tid())
+        .erase(matching_gpu_submission->post_submission_cpu_timestamp());
+  }
 }
 
 void CaptureEventProcessor::ProcessGpuQueueSubmission(
@@ -248,18 +251,26 @@ void CaptureEventProcessor::ProcessGpuQueueSubmission(
       gpu_queue_submission.thread_id(), gpu_queue_submission.pre_submission_cpu_timestamp(),
       gpu_queue_submission.post_submission_cpu_timestamp());
 
-  // TODO: only store if matching gpu job == nullptr and we have not processed all begin markers
-  tid_to_post_submission_time_to_gpu_submission_
-      [gpu_queue_submission.thread_id()][gpu_queue_submission.post_submission_cpu_timestamp()] =
-          gpu_queue_submission;
+  if (matching_gpu_job == nullptr || gpu_queue_submission.num_begin_markers() > 0) {
+    tid_to_post_submission_time_to_gpu_submission_
+        [gpu_queue_submission.thread_id()][gpu_queue_submission.post_submission_cpu_timestamp()] =
+            gpu_queue_submission;
+  }
+  if (gpu_queue_submission.num_begin_markers() > 0) {
+    tid_to_post_submission_time_to_num_begin_markers_
+        [gpu_queue_submission.thread_id()][gpu_queue_submission.post_submission_cpu_timestamp()] =
+            gpu_queue_submission.num_begin_markers();
+  }
   if (matching_gpu_job == nullptr) {
     return;
   }
   DoProcessGpuQueueSubmission(gpu_queue_submission, *matching_gpu_job);
-  /*TODO: ONLY ERASE IF ALL MARKERS HAVE BEEN PROCESSED
-  tid_to_submission_time_to_gpu_job_.at(gpu_queue_submission.thread_id())
-      .erase(matching_gpu_job->amdgpu_cs_ioctl_time_ns());
-      */
+
+  if (!HasUnprocessedBeginMarkers(gpu_queue_submission.thread_id(),
+                                  gpu_queue_submission.post_submission_cpu_timestamp())) {
+    tid_to_submission_time_to_gpu_job_.at(gpu_queue_submission.thread_id())
+        .erase(matching_gpu_job->amdgpu_cs_ioctl_time_ns());
+  }
 }
 
 const GpuQueueSubmisssion* CaptureEventProcessor::FindMatchingGpuQueueSubmission(
@@ -325,7 +336,8 @@ void CaptureEventProcessor::DoProcessGpuQueueSubmission(
   uint64_t command_buffer_text_key = GetStringHashAndSendToListenerIfNecessary(command_buffer_text);
   std::string timeline;
   if (matching_gpu_job.timeline_or_key_case() == GpuJob::kTimelineKey) {
-    timeline = string_intern_pool[matching_gpu_job.timeline_key()];
+    CHECK(string_intern_pool_.contains(matching_gpu_job.timeline_key()));
+    timeline = string_intern_pool_.at(matching_gpu_job.timeline_key());
   } else {
     timeline = matching_gpu_job.timeline();
   }
@@ -364,11 +376,6 @@ void CaptureEventProcessor::DoProcessGpuQueueSubmission(
     if (completed_marker.has_begin_marker()) {
       const auto& begin_marker_info = completed_marker.begin_marker();
 
-      const GpuJob* matching_begin_job =
-          FindMatchingGpuJob(begin_marker_info.begin_thread_id(),
-                             begin_marker_info.begin_pre_submission_cpu_timestamp(),
-                             begin_marker_info.begin_post_submission_cpu_timestamp());
-
       if (tid_to_post_submission_time_to_gpu_submission_.contains(
               begin_marker_info.begin_thread_id())) {
         const auto& post_submission_time_to_submission =
@@ -392,12 +399,23 @@ void CaptureEventProcessor::DoProcessGpuQueueSubmission(
             }
           }
           CHECK(begin_submission_first_command_buffer.has_value());
+
+          const GpuJob* matching_begin_job =
+              FindMatchingGpuJob(begin_marker_info.begin_thread_id(),
+                                 begin_marker_info.begin_pre_submission_cpu_timestamp(),
+                                 begin_marker_info.begin_post_submission_cpu_timestamp());
+          CHECK(matching_begin_job != nullptr);
+
           marker_timer.set_start(completed_marker.begin_marker().begin_gpu_timestamp_ns() +
                                  matching_begin_job->gpu_hardware_start_time_ns() -
                                  begin_submission_first_command_buffer->begin_gpu_timestamp_ns());
           if (matching_begin_submission.thread_id() == gpu_queue_submission.thread_id()) {
             marker_timer.set_thread_id(gpu_queue_submission.thread_id());
           }
+
+          DecrementUnprocessedBeginMarkers(
+              matching_begin_submission.thread_id(),
+              matching_begin_submission.post_submission_cpu_timestamp());
         }
       }
     }
@@ -415,7 +433,9 @@ void CaptureEventProcessor::DoProcessGpuQueueSubmission(
                          first_command_buffer->begin_gpu_timestamp_ns() +
                          matching_gpu_job.gpu_hardware_start_time_ns());
 
-    uint64_t text_key = GetStringHashAndSendToListenerIfNecessary(completed_marker.text());
+    CHECK(string_intern_pool_.contains(completed_marker.text_key()));
+    const std::string& text = string_intern_pool_.at(completed_marker.text_key());
+    uint64_t text_key = GetStringHashAndSendToListenerIfNecessary(text);
     marker_timer.set_user_data_key(text_key);
     capture_listener_->OnTimer(marker_timer);
   }
@@ -475,14 +495,14 @@ void CaptureEventProcessor::ProcessThreadStateSlice(const ThreadStateSlice& thre
 void CaptureEventProcessor::ProcessAddressInfo(const AddressInfo& address_info) {
   std::string function_name;
   if (address_info.function_name_or_key_case() == AddressInfo::kFunctionNameKey) {
-    function_name = string_intern_pool[address_info.function_name_key()];
+    function_name = string_intern_pool_[address_info.function_name_key()];
   } else {
     function_name = address_info.function_name();
   }
 
   std::string map_name;
   if (address_info.map_name_or_key_case() == AddressInfo::kMapNameKey) {
-    map_name = string_intern_pool[address_info.map_name_key()];
+    map_name = string_intern_pool_[address_info.map_name_key()];
   } else {
     map_name = address_info.map_name();
   }
@@ -556,5 +576,32 @@ void CaptureEventProcessor::SendTracepointInfoToListenerIfNecessary(
   if (!tracepoint_hashes_seen_.contains(hash)) {
     tracepoint_hashes_seen_.emplace(hash);
     capture_listener_->OnUniqueTracepointInfo(hash, tracepoint_info);
+  }
+}
+bool CaptureEventProcessor::HasUnprocessedBeginMarkers(int32_t thread_id,
+                                                       uint64_t post_submission_timestamp) const {
+  if (!tid_to_post_submission_time_to_num_begin_markers_.contains(thread_id)) {
+    return false;
+  }
+  if (!tid_to_post_submission_time_to_num_begin_markers_.at(thread_id).contains(
+          post_submission_timestamp)) {
+    return false;
+  }
+  CHECK(tid_to_post_submission_time_to_num_begin_markers_.at(thread_id).at(
+            post_submission_timestamp) > 0);
+  return true;
+}
+void CaptureEventProcessor::DecrementUnprocessedBeginMarkers(int32_t thread_id,
+                                                             uint64_t post_submission_timestamp) {
+  CHECK(tid_to_post_submission_time_to_num_begin_markers_.contains(thread_id));
+  auto& post_submission_time_to_num_begin_markers =
+      tid_to_post_submission_time_to_num_begin_markers_.at(thread_id);
+  CHECK(post_submission_time_to_num_begin_markers.contains(post_submission_timestamp));
+  uint32_t new_num = --post_submission_time_to_num_begin_markers[post_submission_timestamp];
+  if (new_num == 0) {
+    post_submission_time_to_num_begin_markers.erase(post_submission_timestamp);
+    if (post_submission_time_to_num_begin_markers.empty()) {
+      tid_to_post_submission_time_to_num_begin_markers_.erase(thread_id);
+    }
   }
 }

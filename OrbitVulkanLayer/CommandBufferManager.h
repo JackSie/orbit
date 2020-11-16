@@ -111,6 +111,7 @@ class CommandBufferManager {
     SubmissionMetaInformation meta_information;
     std::vector<SubmitInfo> submit_infos;
     std::vector<MarkerState> completed_markers;
+    uint32_t num_begin_markers = 0;
   };
 
   absl::Mutex mutex_;
